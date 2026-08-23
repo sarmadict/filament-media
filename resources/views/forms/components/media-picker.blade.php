@@ -92,7 +92,7 @@
                         </div>
 
                         <div class="filament-media-picker-modal__content">
-                            @livewire('media-library.media-picker-browser', [
+                            @livewire('filament-media.media-picker-browser', [
                                 'pickerId' => $pickerId,
                                 'acceptedMimeTypes' => $acceptedMimeTypes,
                                 'initialId' => $getState(),
