@@ -45,6 +45,9 @@ return [
 
     'navigation' => [
         'enabled' => true,
+        'group' => 'Media',
+        'label' => null,
+        'sort' => 5,
     ],
 
     'authorization' => [

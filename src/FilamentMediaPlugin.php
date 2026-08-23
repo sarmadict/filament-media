@@ -20,11 +20,9 @@ class FilamentMediaPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        if ((bool) config('filament-media.navigation.enabled', true)) {
-            $panel->pages([
-                MediaLibrary::class,
-            ]);
-        }
+        $panel->pages([
+            MediaLibrary::class,
+        ]);
     }
 
     public function boot(Panel $panel): void

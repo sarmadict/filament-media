@@ -26,8 +26,13 @@ use UnitEnum;
 class MediaLibrary extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-folder-open';
-    protected static string|UnitEnum|null $navigationGroup = 'Media';
-    protected static ?int $navigationSort = 5;
+    protected static string|UnitEnum|null $navigationGroup = null;
+    protected static ?int $navigationSort = null;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return (bool) config('filament-media.navigation.enabled', true);
+    }
 
     protected string $view = 'filament-media::filament.pages.media-library';
 
@@ -39,9 +44,20 @@ class MediaLibrary extends Page
     public int $page = 1;
     public int $perPage = 30;
 
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        return config('filament-media.navigation.group', 'Media');
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return config('filament-media.navigation.sort', 5);
+    }
+
     public static function getNavigationLabel(): string
     {
-        return __('filament-media::media-library.browser_title');
+        return config('filament-media.navigation.label')
+            ?: __('filament-media::media-library.browser_title');
     }
 
     public function getTitle(): string
