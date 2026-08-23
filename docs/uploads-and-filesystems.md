@@ -1,0 +1,49 @@
+# Uploads and filesystem behavior
+
+## Date-based storage
+
+Every upload made through `FileUploader` is written below a date directory. The default date format is `Y/m/d`.
+
+With the default base path `media` on 10 December 2026:
+
+```text
+media/2026/12/10/<uuid>.<extension>
+```
+
+With an empty base path:
+
+```text
+2026/12/10/<uuid>.<extension>
+```
+
+The base path and date format are normalized by `Support\Path`; `.` and `..` path segments are rejected.
+
+## Filenames
+
+Physical filenames use UUIDs. The client filename is stored separately in `media_files.original_name`. This avoids collisions and prevents user-controlled names from determining physical storage paths.
+
+## Browser uploads
+
+When the file browser is at its disk root, uploads use the configured upload base path and date directory. When the administrator browses into a specific directory and uploads there, that directory becomes the base and the current date directory is appended.
+
+The `UploadPathResolver` does not append the same current date directory twice when the supplied base path already ends with that date path.
+
+## Visibility
+
+Set `FILAMENT_MEDIA_VISIBILITY=public` or `private` to force upload visibility. When it is not set, the package uses the selected Laravel disk's configured visibility and defaults to private if no public visibility is declared.
+
+## Preview URLs
+
+`DefaultPreviewUrlResolver`:
+
+- uses `Storage::url()` for disks configured as public;
+- attempts a 15-minute `temporaryUrl()` for non-public disks;
+- returns `null` when the adapter cannot provide a preview URL.
+
+Replace `preview_url_resolver` when your storage provider uses a custom CDN, proxy, or signed URL scheme.
+
+## Registry vs physical storage
+
+A file can physically exist without a `media_files` row. The browser marks it as unregistered and provides a Register action. Registration reads available filesystem metadata and creates or restores the corresponding database row.
+
+Deleting a registered file removes the physical object and soft-deletes the database row after usage checks pass.
