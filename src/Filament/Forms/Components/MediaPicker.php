@@ -17,6 +17,50 @@ class MediaPicker extends Field
      */
     protected array|Closure $acceptedMimeTypes = [];
 
+    protected string|Closure|null $disk = null;
+
+    protected bool|Closure $isInline = false;
+
+    protected bool|Closure $shouldSubmitParentFormOnSelection = false;
+
+    public function disk(string|Closure|null $disk): static
+    {
+        $this->disk = $disk;
+
+        return $this;
+    }
+
+    public function getDisk(): ?string
+    {
+        $disk = $this->evaluate($this->disk);
+
+        return filled($disk) ? (string) $disk : null;
+    }
+
+    public function inline(bool|Closure $condition = true): static
+    {
+        $this->isInline = $condition;
+
+        return $this;
+    }
+
+    public function isInline(): bool
+    {
+        return (bool) $this->evaluate($this->isInline);
+    }
+
+    public function submitParentFormOnSelection(bool|Closure $condition = true): static
+    {
+        $this->shouldSubmitParentFormOnSelection = $condition;
+
+        return $this;
+    }
+
+    public function shouldSubmitParentFormOnSelection(): bool
+    {
+        return (bool) $this->evaluate($this->shouldSubmitParentFormOnSelection);
+    }
+
     public function acceptedMimeTypes(array|Closure $acceptedMimeTypes): static
     {
         $this->acceptedMimeTypes = $acceptedMimeTypes;

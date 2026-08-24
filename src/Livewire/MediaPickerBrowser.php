@@ -24,6 +24,7 @@ class MediaPickerBrowser extends Component
 
     public string $pickerId;
     public string $disk = '';
+    public ?string $lockedDisk = null;
     public string $search = '';
     public string $tab = 'library';
     public ?int $selectedId = null;
@@ -34,18 +35,24 @@ class MediaPickerBrowser extends Component
     /** @var array<int, mixed> */
     public array $uploads = [];
 
-    public function mount(string $pickerId, array $acceptedMimeTypes = [], int|string|null $initialId = null): void
+    public function mount(string $pickerId, array $acceptedMimeTypes = [], int|string|null $initialId = null, ?string $disk = null): void
     {
         $this->pickerId = $pickerId;
         $this->acceptedMimeTypes = array_values($acceptedMimeTypes);
         $this->selectedId = is_numeric($initialId) ? (int) $initialId : null;
-        $this->disk = Disk::default();
+
+        if ($disk !== null) {
+            abort_unless(in_array($disk, Disk::all(), true), 404);
+            $this->lockedDisk = $disk;
+        }
+
+        $this->disk = $this->lockedDisk ?? Disk::default();
     }
 
     /** @return list<string> */
     public function disks(): array
     {
-        return Disk::all();
+        return $this->lockedDisk !== null ? [$this->lockedDisk] : Disk::all();
     }
 
     public function canUpload(): bool
@@ -74,6 +81,18 @@ class MediaPickerBrowser extends Component
         }
     }
 
+    public function selectAndConfirm(int $id): void
+    {
+        $media = $this->baseQuery()->whereKey($id)->first();
+
+        if ($media === null) {
+            return;
+        }
+
+        $this->selectedId = (int) $media->getKey();
+        $this->dispatchSelection($media);
+    }
+
     public function confirmSelection(): void
     {
         if ($this->selectedId === null) {
@@ -93,12 +112,7 @@ class MediaPickerBrowser extends Component
             return;
         }
 
-        $this->dispatch(
-            'filament-media-selected',
-            pickerId: $this->pickerId,
-            id: (int) $media->getKey(),
-            media: $this->mediaData($media),
-        );
+        $this->dispatchSelection($media);
     }
 
     public function storeUploads(): void
@@ -183,6 +197,16 @@ class MediaPickerBrowser extends Component
         }
 
         return $query;
+    }
+
+    private function dispatchSelection(MediaFile $media): void
+    {
+        $this->dispatch(
+            'filament-media-selected',
+            pickerId: $this->pickerId,
+            id: (int) $media->getKey(),
+            media: $this->mediaData($media),
+        );
     }
 
     /** @return array<string, mixed>|null */

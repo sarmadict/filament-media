@@ -83,7 +83,16 @@
 
                         <button
                             type="button"
-                            wire:click="select({{ $media['id'] }})"
+                            x-data="{ clickTimer: null }"
+                            x-on:click="
+                                clearTimeout(clickTimer);
+                                clickTimer = setTimeout(() => $wire.select({{ $media['id'] }}), 220);
+                            "
+                            x-on:dblclick.stop.prevent="
+                                clearTimeout(clickTimer);
+                                clickTimer = null;
+                                $wire.selectAndConfirm({{ $media['id'] }});
+                            "
                             @class(['filament-media-picker-item', 'is-selected' => $selectedId === $media['id']])
                             wire:key="picker-media-{{ $media['id'] }}"
                         >

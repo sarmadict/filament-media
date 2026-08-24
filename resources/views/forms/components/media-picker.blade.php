@@ -2,12 +2,44 @@
     $pickerId = $getPickerId();
     $selectedMedia = $getSelectedMediaData();
     $acceptedMimeTypes = $getAcceptedMimeTypes();
+    $disk = $getDisk();
+    $inline = $isInline();
+    $submitParentFormOnSelection = $shouldSubmitParentFormOnSelection();
+    $browserParameters = [
+        'pickerId' => $pickerId,
+        'acceptedMimeTypes' => $acceptedMimeTypes,
+        'initialId' => $getState(),
+    ];
+
+    if (filled($disk)) {
+        $browserParameters['disk'] = $disk;
+    }
 @endphp
 
 <x-dynamic-component
     :component="$getFieldWrapperView()"
     :field="$field"
 >
+    @if ($inline)
+        <div
+            class="filament-media-picker-field filament-media-picker-field--inline"
+            x-data="{
+                state: $wire.$entangle('{{ $getStatePath() }}'),
+                pickerId: @js($pickerId),
+                submitParentFormOnSelection: @js($submitParentFormOnSelection),
+            }"
+            @filament-media-selected.window="
+                if ($event.detail.pickerId !== pickerId) return;
+                state = $event.detail.id;
+
+                if (submitParentFormOnSelection) {
+                    $nextTick(() => $el.closest('form')?.requestSubmit());
+                }
+            "
+        >
+            @livewire('filament-media.media-picker-browser', $browserParameters, key($pickerId))
+        </div>
+    @else
     <div
         class="filament-media-picker-field"
         x-data="{
@@ -92,21 +124,20 @@
                         </div>
 
                         <div class="filament-media-picker-modal__content">
-                            @livewire('filament-media.media-picker-browser', [
-                                'pickerId' => $pickerId,
-                                'acceptedMimeTypes' => $acceptedMimeTypes,
-                                'initialId' => $getState(),
-                            ], key($pickerId))
+                            @livewire('filament-media.media-picker-browser', $browserParameters, key($pickerId))
                         </div>
                     </div>
                 </div>
         @endunless
     </div>
 
+    @endif
     @once
         <style>
             [x-cloak] { display: none !important; }
             .filament-media-picker-field { width: 100%; }
+            .filament-media-picker-field--inline { height: min(68vh, 680px); min-height: 520px; overflow: hidden; border: 1px solid rgb(229 231 235); border-radius: 12px; }
+            .dark .filament-media-picker-field--inline { border-color: rgb(55 65 81); }
             .filament-media-picker-field__selection { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px; border: 1px solid rgb(229 231 235); border-radius: 12px; background: rgb(249 250 251); }
             .dark .filament-media-picker-field__selection { background: rgb(31 41 55); border-color: rgb(75 85 99); }
             .filament-media-picker-field__preview { width: 82px; height: 68px; border-radius: 9px; overflow: hidden; display: grid; place-items: center; background: rgb(229 231 235); }
@@ -143,6 +174,7 @@
             .filament-media-picker-modal__header svg { width: 20px; height: 20px; }
             .filament-media-picker-modal__content { min-height: 0; overflow: hidden; }
             @media (max-width: 720px) {
+                .filament-media-picker-field--inline { height: 72vh; min-height: 460px; }
                 .filament-media-picker-field__selection { grid-template-columns: 62px minmax(0, 1fr); }
                 .filament-media-picker-field__preview { width: 62px; height: 56px; }
                 .filament-media-picker-field__actions { grid-column: 1 / -1; }
