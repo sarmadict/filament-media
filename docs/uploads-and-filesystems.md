@@ -4,10 +4,10 @@
 
 Every upload made through `FileUploader` is written below a date directory. The default date format is `Y/m/d`.
 
-With the default base path `media` on 10 December 2026:
+With the default base path `uploads` on 10 December 2026:
 
 ```text
-media/2026/12/10/<uuid>.<extension>
+uploads/2026/12/10/<uuid>.<extension>
 ```
 
 With an empty base path:
@@ -22,11 +22,11 @@ The base path and date format are normalized by `Support\Path`; `.` and `..` pat
 
 Physical filenames use UUIDs. The client filename is stored separately in `media_files.original_name`. This avoids collisions and prevents user-controlled names from determining physical storage paths.
 
-## Browser uploads
+## Upload disk and browser uploads
 
-When the file browser is at its disk root, uploads use the configured upload base path and date directory. When the administrator browses into a specific directory and uploads there, that directory becomes the base and the current date directory is appended.
+Uploads are only written to the disk configured by `FILAMENT_MEDIA_DISK` (`filament-media.upload.disk`). Administrators can browse every disk allowed by the package, but upload controls are available only while the configured media disk is selected.
 
-The `UploadPathResolver` does not append the same current date directory twice when the supplied base path already ends with that date path.
+Browser and media-picker uploads always use the configured upload base path plus the date directory; the currently browsed folder does not override the configured base path. The `UploadPathResolver` does not append the same current date directory twice when a caller explicitly supplies a base path that already ends with that date path.
 
 ## Visibility
 
@@ -44,6 +44,6 @@ Replace `preview_url_resolver` when your storage provider uses a custom CDN, pro
 
 ## Registry vs physical storage
 
-A file can physically exist without a `media_files` row. The browser marks it as unregistered and provides a Register action. Registration reads available filesystem metadata and creates or restores the corresponding database row.
+A file can physically exist without a `media_files` row. On the configured media disk, the browser marks it as unregistered and provides a Register action. Registration reads available filesystem metadata and creates or restores the corresponding database row. Files on other browsable disks cannot be registered as new `media_files` records.
 
 Deleting a registered file removes the physical object and soft-deletes the database row after usage checks pass.

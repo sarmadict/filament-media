@@ -83,6 +83,16 @@ class MediaLibrary extends Page
         return $this->hasPermission('media_files.create');
     }
 
+    public function canUploadMedia(): bool
+    {
+        return $this->canCreateMedia() && $this->disk === Disk::upload();
+    }
+
+    public function canRegisterMedia(): bool
+    {
+        return $this->canCreateMedia() && $this->disk === Disk::upload();
+    }
+
     public function canUpdateMedia(): bool
     {
         return $this->hasPermission('media_files.update');
@@ -217,6 +227,7 @@ class MediaLibrary extends Page
     {
         $this->assertCurrentDisk();
         $this->authorizePermission('media_files.create');
+        abort_unless($this->disk === Disk::upload(), 403);
         $path = $this->decodePath($encodedPath);
 
         try {
@@ -330,7 +341,7 @@ class MediaLibrary extends Page
         return Action::make('uploadFiles')
             ->label(__('filament-media::media-library.actions.upload'))
             ->icon('heroicon-o-arrow-up-tray')
-            ->visible(fn (): bool => $this->hasPermission('media_files.create'))
+            ->visible(fn (): bool => $this->canUploadMedia())
             ->schema([
                 FileUpload::make('files')
                     ->label(__('filament-media::media-library.upload.files'))
@@ -341,13 +352,10 @@ class MediaLibrary extends Page
             ->action(function (array $data): void {
                 $this->assertCurrentDisk();
                 $this->authorizePermission('media_files.create');
+                abort_unless($this->disk === Disk::upload(), 403);
 
                 foreach ((array) ($data['files'] ?? []) as $file) {
-                    app(FileUploader::class)->upload(
-                        $file,
-                        $this->disk,
-                        $this->path !== '' ? $this->path : null,
-                    );
+                    app(FileUploader::class)->upload($file);
                 }
 
                 Notification::make()

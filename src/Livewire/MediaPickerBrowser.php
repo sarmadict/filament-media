@@ -50,7 +50,7 @@ class MediaPickerBrowser extends Component
 
     public function canUpload(): bool
     {
-        return app(AuthorizationManager::class)->allows('create');
+        return app(AuthorizationManager::class)->allows('create') && $this->disk === Disk::upload();
     }
 
     public function updatedSearch(): void
@@ -104,6 +104,7 @@ class MediaPickerBrowser extends Component
     public function storeUploads(): void
     {
         abort_unless(in_array($this->disk, $this->disks(), true), 404);
+        abort_unless($this->disk === Disk::upload(), 403);
         app(AuthorizationManager::class)->authorize('create');
 
         if ($this->uploads === []) {
@@ -127,7 +128,7 @@ class MediaPickerBrowser extends Component
             }
 
             try {
-                $lastMedia = app(FileUploader::class)->upload($file, $this->disk);
+                $lastMedia = app(FileUploader::class)->upload($file);
             } catch (Throwable $exception) {
                 report($exception);
 

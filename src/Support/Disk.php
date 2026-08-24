@@ -2,6 +2,8 @@
 
 namespace Sarmadict\FilamentMedia\Support;
 
+use RuntimeException;
+
 final class Disk
 {
     /** @return list<string> */
@@ -27,17 +29,23 @@ final class Disk
     public static function default(): string
     {
         $disks = self::all();
-        $configured = (string) config('filament-media.upload.disk', '');
-        $filesystemDefault = (string) config('filesystems.default', 'local');
+        $mediaDisk = self::upload();
 
-        if ($configured !== '' && in_array($configured, $disks, true)) {
-            return $configured;
+        if (in_array($mediaDisk, $disks, true)) {
+            return $mediaDisk;
         }
 
-        if (in_array($filesystemDefault, $disks, true)) {
-            return $filesystemDefault;
+        return $disks[0] ?? $mediaDisk;
+    }
+
+    public static function upload(): string
+    {
+        $disk = trim((string) config('filament-media.upload.disk', 'public'));
+
+        if ($disk === '' || ! array_key_exists($disk, (array) config('filesystems.disks', []))) {
+            throw new RuntimeException('filament-media.upload.disk must reference a configured filesystem disk.');
         }
 
-        return $disks[0] ?? $configured ?: $filesystemDefault;
+        return $disk;
     }
 }

@@ -37,7 +37,7 @@ Set these before the package migration is run. Changing them after production da
 ```php
 'upload' => [
     'disk' => env('FILAMENT_MEDIA_DISK', 'public'),
-    'path' => env('FILAMENT_MEDIA_UPLOAD_PATH', 'media'),
+    'path' => env('FILAMENT_MEDIA_UPLOAD_PATH', 'uploads'),
     'visibility' => env('FILAMENT_MEDIA_VISIBILITY'),
     'date_directories' => [
         'enabled' => env('FILAMENT_MEDIA_DATE_DIRECTORIES', true),
@@ -46,10 +46,12 @@ Set these before the package migration is run. Changing them after production da
 ],
 ```
 
+`FILAMENT_MEDIA_DISK` is the authoritative disk for new uploads and for registering existing physical files into `media_files`. Other allowed disks remain browsable, but cannot receive uploads or new media registrations.
+
 Default output:
 
 ```text
-media/2026/12/10/550e8400-e29b-41d4-a716-446655440000.jpg
+uploads/2026/12/10/550e8400-e29b-41d4-a716-446655440000.jpg
 ```
 
 To produce exactly a date-rooted layout:

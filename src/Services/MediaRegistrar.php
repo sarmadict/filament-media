@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Sarmadict\FilamentMedia\Contracts\MediaRepository;
 use Sarmadict\FilamentMedia\Models\MediaFile;
+use Sarmadict\FilamentMedia\Support\Disk;
 
 class MediaRegistrar
 {
@@ -17,6 +18,10 @@ class MediaRegistrar
 
     public function register(string $disk, string $path, ?string $originalName = null): MediaFile
     {
+        if ($disk !== Disk::upload()) {
+            throw new RuntimeException('Media files can only be registered from the configured media disk.');
+        }
+
         $filesystem = Storage::disk($disk);
 
         if (! $filesystem->exists($path)) {

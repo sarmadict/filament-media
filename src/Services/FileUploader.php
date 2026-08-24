@@ -20,7 +20,13 @@ class FileUploader
 
     public function upload(UploadedFile $file, ?string $disk = null, ?string $directory = null): MediaFile
     {
-        $disk ??= Disk::default();
+        $uploadDisk = Disk::upload();
+
+        if ($disk !== null && $disk !== $uploadDisk) {
+            throw new RuntimeException('Uploads are only allowed on the configured media disk.');
+        }
+
+        $disk = $uploadDisk;
         $directory = $this->uploadPathResolver->resolve($directory);
         $extension = strtolower((string) $file->getClientOriginalExtension());
         $fileName = Str::uuid()->toString().($extension !== '' ? ".{$extension}" : '');

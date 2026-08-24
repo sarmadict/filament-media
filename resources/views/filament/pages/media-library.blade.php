@@ -17,6 +17,8 @@
                 path: null,
                 name: null,
                 encodedPath: null,
+                type: null,
+                registered: false,
             },
             renameModal: {
                 open: false,
@@ -29,6 +31,7 @@
             },
             locale: @js(app()->getLocale() === 'fa' ? 'fa-IR' : 'en-US'),
             deleteDirectoryConfirmation: @js(__('filament-media::media-library.confirmations.delete_directory')),
+            deleteFileConfirmation: @js(__('filament-media::media-library.confirmations.delete_file')),
             selectDirectory(path) {
                 this.selectedDirectory = path;
                 this.contextMenu.open = false;
@@ -44,6 +47,23 @@
                     path,
                     name,
                     encodedPath,
+                    type: 'directory',
+                    registered: false,
+                };
+            },
+            showFileMenu(event, file, encodedPath) {
+                this.selectedDirectory = null;
+                const menuWidth = 190;
+                const menuHeight = 104;
+                this.contextMenu = {
+                    open: true,
+                    x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+                    y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+                    path: file.path,
+                    name: file.name,
+                    encodedPath,
+                    type: 'file',
+                    registered: Boolean(file.registered),
                 };
             },
             beginRename() {
@@ -251,6 +271,7 @@
                             class="filament-media-card filament-media-card--file"
                             wire:key="media-entry-{{ md5($entry['path']) }}"
                             x-on:click.stop="openFile(@js($entry))"
+                            x-on:contextmenu.prevent.stop="showFileMenu($event, @js($entry), @js($encodedPath))"
                             tabindex="0"
                             x-on:keydown.enter.prevent="openFile(@js($entry))"
                         >
@@ -286,7 +307,7 @@
                             </div>
 
                             <div class="filament-media-card__actions">
-                                @if (! $entry['registered'] && $this->canCreateMedia())
+                                @if (! $entry['registered'] && $this->canRegisterMedia())
                                     <button
                                         type="button"
                                         class="filament-media-icon-action"
@@ -337,8 +358,19 @@
             x-bind:style="`left: ${contextMenu.x}px; top: ${contextMenu.y}px`"
             x-on:click.stop
         >
+            @if ($this->canRegisterMedia())
+                <button
+                    type="button"
+                    x-show="contextMenu.type === 'file' && ! contextMenu.registered"
+                    x-on:click.stop="$wire.registerFile(contextMenu.encodedPath); contextMenu.open = false"
+                >
+                    <x-filament::icon icon="heroicon-o-plus-circle" />
+                    <span>{{ __('filament-media::media-library.actions.register') }}</span>
+                </button>
+            @endif
+
             @if ($this->canUpdateMedia())
-                <button type="button" x-on:click.stop="beginRename()">
+                <button type="button" x-show="contextMenu.type === 'directory'" x-on:click.stop="beginRename()">
                     <x-filament::icon icon="heroicon-o-pencil-square" />
                     <span>{{ __('filament-media::media-library.actions.rename') }}</span>
                 </button>
@@ -348,7 +380,18 @@
                 <button
                     type="button"
                     class="is-danger"
+                    x-show="contextMenu.type === 'directory'"
                     x-on:click.stop="if (window.confirm(deleteDirectoryConfirmation)) { $wire.deleteDirectory(contextMenu.encodedPath); selectedDirectory = null; } contextMenu.open = false"
+                >
+                    <x-filament::icon icon="heroicon-o-trash" />
+                    <span>{{ __('filament-media::media-library.actions.delete') }}</span>
+                </button>
+
+                <button
+                    type="button"
+                    class="is-danger"
+                    x-show="contextMenu.type === 'file'"
+                    x-on:click.stop="if (window.confirm(deleteFileConfirmation)) { $wire.deleteFile(contextMenu.encodedPath); } contextMenu.open = false"
                 >
                     <x-filament::icon icon="heroicon-o-trash" />
                     <span>{{ __('filament-media::media-library.actions.delete') }}</span>
