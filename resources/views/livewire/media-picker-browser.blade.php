@@ -15,7 +15,14 @@
     </div>
 
     @if ($tab === 'upload' && $canUpload)
-        <div class="filament-media-picker-upload">
+        <div
+            class="filament-media-picker-upload"
+            x-data="{ isUploading: false }"
+            x-on:livewire-upload-start="isUploading = true"
+            x-on:livewire-upload-finish="isUploading = false"
+            x-on:livewire-upload-error="isUploading = false"
+            x-on:livewire-upload-cancel="isUploading = false"
+        >
             <div class="filament-media-picker-upload__dropzone">
                 <x-filament::icon icon="heroicon-o-cloud-arrow-up" />
                 <strong>{{ __('filament-media::media-library.actions.upload') }}</strong>
@@ -42,7 +49,8 @@
                     class="filament-media-picker-confirm"
                     wire:click="storeUploads"
                     wire:loading.attr="disabled"
-                    wire:target="uploads,storeUploads"
+                    wire:target="storeUploads"
+                    x-bind:disabled="isUploading || $wire.uploads.length === 0"
                     @disabled($uploads === [])
                 >
                     <x-filament::icon icon="heroicon-o-arrow-up-tray" />
