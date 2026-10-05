@@ -23,10 +23,15 @@ class MediaPickerBrowser extends Component
     use WithPagination;
 
     public string $pickerId;
+
     public string $disk = '';
+
     public ?string $lockedDisk = null;
+
     public string $search = '';
+
     public string $tab = 'library';
+
     public ?int $selectedId = null;
 
     /** @var list<string> */
@@ -35,8 +40,13 @@ class MediaPickerBrowser extends Component
     /** @var array<int, mixed> */
     public array $uploads = [];
 
-    public function mount(string $pickerId, array $acceptedMimeTypes = [], int|string|null $initialId = null, ?string $disk = null): void
-    {
+    public function mount(
+        string $pickerId,
+        array $acceptedMimeTypes = [],
+        int|string|null $initialId = null,
+        ?string $disk = null,
+        ?string $initialDisk = null,
+    ): void {
         $this->pickerId = $pickerId;
         $this->acceptedMimeTypes = array_values($acceptedMimeTypes);
         $this->selectedId = is_numeric($initialId) ? (int) $initialId : null;
@@ -46,7 +56,8 @@ class MediaPickerBrowser extends Component
             $this->lockedDisk = $disk;
         }
 
-        $this->disk = $this->lockedDisk ?? Disk::default();
+        $this->disk = $this->lockedDisk
+            ?? (in_array($initialDisk, Disk::all(), true) ? $initialDisk : Disk::default());
     }
 
     /** @return list<string> */

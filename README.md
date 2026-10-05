@@ -41,6 +41,15 @@ use Sarmadict\FilamentMedia\Filament\Forms\Components\MediaPicker;
 MediaPicker::make('cover_media_id')->images();
 ```
 
+Store the disk-relative file path instead of the media ID when needed:
+
+```php
+MediaPicker::make('cover_path')
+    ->images()
+    ->resultType(MediaPicker::RESULT_PATH)
+    ->disk('public');
+```
+
 The default upload path is `media/{Y}/{m}/{d}`. Set `FILAMENT_MEDIA_UPLOAD_PATH=` to store directly under `{Y}/{m}/{d}`.
 
 See [docs/index.md](docs/index.md) for the complete documentation.

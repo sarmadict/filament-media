@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added per-field `MediaPicker` result types so selections can store either the media ID or its disk-relative path.
+
 ## 1.0.0 - 2026-08-17
 
 - Extracted the media library from the host application into `sarmadict/filament-media`.

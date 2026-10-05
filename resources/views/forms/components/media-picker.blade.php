@@ -5,10 +5,12 @@
     $disk = $getDisk();
     $inline = $isInline();
     $submitParentFormOnSelection = $shouldSubmitParentFormOnSelection();
+    $resultType = $getResultType();
     $browserParameters = [
         'pickerId' => $pickerId,
         'acceptedMimeTypes' => $acceptedMimeTypes,
-        'initialId' => $getState(),
+        'initialId' => $selectedMedia['id'] ?? null,
+        'initialDisk' => $selectedMedia['disk'] ?? null,
     ];
 
     if (filled($disk)) {
@@ -26,11 +28,12 @@
             x-data="{
                 state: $wire.$entangle('{{ $getStatePath() }}'),
                 pickerId: @js($pickerId),
+                resultType: @js($resultType),
                 submitParentFormOnSelection: @js($submitParentFormOnSelection),
             }"
             @filament-media-selected.window="
                 if ($event.detail.pickerId !== pickerId) return;
-                state = $event.detail.id;
+                state = $event.detail.media[resultType];
 
                 if (submitParentFormOnSelection) {
                     $nextTick(() => $el.closest('form')?.requestSubmit());
@@ -46,11 +49,12 @@
             state: $wire.$entangle('{{ $getStatePath() }}'),
             open: false,
             pickerId: @js($pickerId),
+            resultType: @js($resultType),
             selected: @js($selectedMedia),
         }"
         @filament-media-selected.window="
             if ($event.detail.pickerId !== pickerId) return;
-            state = $event.detail.id;
+            state = $event.detail.media[resultType];
             selected = $event.detail.media;
             open = false;
         "

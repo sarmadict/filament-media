@@ -45,7 +45,7 @@ php artisan vendor:publish --tag=filament-media-translations
 
 ## Use the media picker
 
-`MediaPicker` stores one active, registered `media_files.id` value. Back its field with a nullable foreign key when the selection is optional.
+`MediaPicker` stores one active, registered media selection. It returns `media_files.id` by default; back an optional ID field with a nullable foreign key.
 
 ```php
 use Sarmadict\FilamentMedia\Filament\Forms\Components\MediaPicker;
@@ -54,6 +54,19 @@ MediaPicker::make('cover_media_id')
     ->label('Cover')
     ->images();
 ```
+
+Choose the result type on each field. Keep the default ID result for stable relationships, or store the disk-relative `media_files.path` in a string column:
+
+```php
+MediaPicker::make('cover_path')
+    ->resultType(MediaPicker::RESULT_PATH)
+    ->disk('public')
+    ->images();
+```
+
+The supported constants are `MediaPicker::RESULT_ID` and `MediaPicker::RESULT_PATH`. `RESULT_ID` remains the default. A path result is relative to its Laravel filesystem disk, not an absolute path or URL. Back it with a string column sized for the 700-character `media_files.path` value. Specify `disk()` for path-backed fields whenever possible because the same path can exist on multiple disks. If it is omitted, existing values resolve against the default disk first and then the other allowed disks.
+
+Do not define a `BelongsTo` relationship or add a path-backed column to `usage.direct_references`; those mechanisms require media IDs. Path-backed values also are not updated when media paths change, so use ID results when references must survive file or directory moves.
 
 Available MIME helpers are `images()`, `videos()`, `audio()`, and `documents()`. Use `acceptedMimeTypes([...])` for a custom set:
 

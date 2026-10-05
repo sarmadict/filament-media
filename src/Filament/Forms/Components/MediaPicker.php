@@ -2,14 +2,21 @@
 
 namespace Sarmadict\FilamentMedia\Filament\Forms\Components;
 
-use Sarmadict\FilamentMedia\Contracts\MediaRepository;
-use Sarmadict\FilamentMedia\Contracts\PreviewUrlResolver;
-use Sarmadict\FilamentMedia\Support\FileType;
 use Closure;
 use Filament\Forms\Components\Field;
+use InvalidArgumentException;
+use Sarmadict\FilamentMedia\Contracts\MediaRepository;
+use Sarmadict\FilamentMedia\Contracts\PreviewUrlResolver;
+use Sarmadict\FilamentMedia\Models\MediaFile;
+use Sarmadict\FilamentMedia\Support\Disk;
+use Sarmadict\FilamentMedia\Support\FileType;
 
 class MediaPicker extends Field
 {
+    public const RESULT_ID = 'id';
+
+    public const RESULT_PATH = 'path';
+
     protected string $view = 'filament-media::forms.components.media-picker';
 
     /**
@@ -22,6 +29,30 @@ class MediaPicker extends Field
     protected bool|Closure $isInline = false;
 
     protected bool|Closure $shouldSubmitParentFormOnSelection = false;
+
+    protected string|Closure $resultType = self::RESULT_ID;
+
+    public function resultType(string|Closure $resultType): static
+    {
+        $this->resultType = $resultType;
+
+        return $this;
+    }
+
+    public function getResultType(): string
+    {
+        $resultType = $this->evaluate($this->resultType);
+
+        if (! in_array($resultType, [self::RESULT_ID, self::RESULT_PATH], true)) {
+            throw new InvalidArgumentException(sprintf(
+                'MediaPicker result type must be [%s] or [%s].',
+                self::RESULT_ID,
+                self::RESULT_PATH,
+            ));
+        }
+
+        return $resultType;
+    }
 
     public function disk(string|Closure|null $disk): static
     {
@@ -108,7 +139,7 @@ class MediaPicker extends Field
 
     public function getPickerId(): string
     {
-        return 'media-picker-' . md5($this->getStatePath());
+        return 'media-picker-'.md5($this->getStatePath());
     }
 
     /**
@@ -116,13 +147,7 @@ class MediaPicker extends Field
      */
     public function getSelectedMediaData(): ?array
     {
-        $id = $this->getState();
-
-        if (! is_numeric($id)) {
-            return null;
-        }
-
-        $media = app(MediaRepository::class)->findActiveById((int) $id);
+        $media = $this->resolveSelectedMedia();
 
         if ($media === null) {
             return null;
@@ -132,11 +157,52 @@ class MediaPicker extends Field
             'id' => $media->getKey(),
             'name' => $media->original_name ?: $media->file_name,
             'file_name' => $media->file_name,
+            'disk' => $media->disk,
+            'path' => $media->path,
             'mime_type' => $media->mime_type,
             'size' => FileType::humanSize((int) $media->size_bytes),
             'url' => FileType::isImageMime($media->mime_type)
                 ? app(PreviewUrlResolver::class)->forMedia($media)
                 : null,
         ];
+    }
+
+    private function resolveSelectedMedia(): ?MediaFile
+    {
+        $state = $this->getState();
+        $repository = app(MediaRepository::class);
+
+        if ($this->getResultType() === self::RESULT_ID) {
+            return is_numeric($state)
+                ? $repository->findActiveById((int) $state)
+                : null;
+        }
+
+        if (! is_string($state) || blank($state)) {
+            return null;
+        }
+
+        foreach ($this->candidateDisks() as $disk) {
+            $media = $repository->findByLocation($disk, $state);
+
+            if ($media !== null && $media->state) {
+                return $media;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<string> */
+    private function candidateDisks(): array
+    {
+        if (($disk = $this->getDisk()) !== null) {
+            return [$disk];
+        }
+
+        return array_values(array_unique([
+            Disk::default(),
+            ...Disk::all(),
+        ]));
     }
 }
