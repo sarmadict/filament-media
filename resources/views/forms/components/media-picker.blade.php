@@ -11,11 +11,22 @@
         'acceptedMimeTypes' => $acceptedMimeTypes,
         'initialId' => $selectedMedia['id'] ?? null,
         'initialDisk' => $selectedMedia['disk'] ?? null,
+        'uploadPath' => $getUploadPath(),
+        'uploadPathType' => $getUploadPathType(),
+        'uploadFilenameType' => $getUploadFilenameType(),
+        'uploadDateFormat' => $getUploadDateFormat(),
     ];
 
     if (filled($disk)) {
         $browserParameters['disk'] = $disk;
     }
+
+    $browserKey = $pickerId.'-'.md5(json_encode([
+        $browserParameters['uploadPath'],
+        $browserParameters['uploadPathType'],
+        $browserParameters['uploadFilenameType'],
+        $browserParameters['uploadDateFormat'],
+    ]));
 @endphp
 
 <x-dynamic-component
@@ -40,7 +51,7 @@
                 }
             "
         >
-            @livewire('filament-media.media-picker-browser', $browserParameters, key($pickerId))
+            @livewire('filament-media.media-picker-browser', $browserParameters, key($browserKey))
         </div>
     @else
     <div
@@ -128,7 +139,7 @@
                         </div>
 
                         <div class="filament-media-picker-modal__content">
-                            @livewire('filament-media.media-picker-browser', $browserParameters, key($pickerId))
+                            @livewire('filament-media.media-picker-browser', $browserParameters, key($browserKey))
                         </div>
                     </div>
                 </div>

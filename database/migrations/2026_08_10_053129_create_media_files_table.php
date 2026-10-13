@@ -15,6 +15,7 @@ return new class extends Migration
         if (! Schema::hasTable($mediaFiles)) {
             Schema::create($mediaFiles, function (Blueprint $table) use ($users) {
                 $table->id();
+                $table->uuid('uuid')->nullable()->unique();
                 $table->string('disk', 64)->default('public');
                 $table->string('path', 700);
                 $table->string('original_name');

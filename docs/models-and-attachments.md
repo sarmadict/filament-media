@@ -10,6 +10,10 @@ The package provides:
 
 The default model uses soft deletes and casts `metadata` to an array and `state` to boolean. It tracks `created_by` and `updated_by` from the current authenticated user when available.
 
+Every row has a unique, non-null `uuid` generated as a time-ordered UUIDv7, in addition to its auto-incrementing numeric `id`. The numeric primary key and attachment foreign keys remain unchanged. UUID filename mode uses the same UUID in `{uuid}.{extension}`; hash filename mode still assigns a registry UUID.
+
+The upgrade migration backfills UUIDs for existing records, including soft-deleted media, without renaming existing physical files. Re-registering or restoring a registered file preserves its UUID.
+
 ## Custom media model
 
 ```php

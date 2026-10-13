@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added unique time-ordered UUIDv7 values to media records, with an upgrade migration that backfills existing and soft-deleted rows.
+- Added independent date, UUID-prefix, and flat upload layouts and UUID/hash filename strategies, with per-field path and naming overrides.
+- Replaced the date-directory toggle with a single `upload.path_type` setting and moved the date format to `upload.date_format`.
+- Added UUID, filename, media_id, and full_path picker results and a configurable application default.
+- Added configurable media attributes and disk columns for deletion checks on non-ID references.
+- Updated the package development skill and documentation for all upload and picker options.
 - Added per-field `MediaPicker` result types so selections can store either the media ID or its disk-relative path.
 
 ## 1.0.0 - 2026-08-17

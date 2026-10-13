@@ -13,10 +13,9 @@ class MediaRegistrar
     public function __construct(
         private readonly MediaRepository $mediaRepository,
         private readonly MediaMetadataReader $metadataReader,
-    ) {
-    }
+    ) {}
 
-    public function register(string $disk, string $path, ?string $originalName = null): MediaFile
+    public function register(string $disk, string $path, ?string $originalName = null, ?string $uuid = null): MediaFile
     {
         if ($disk !== Disk::upload()) {
             throw new RuntimeException('Media files can only be registered from the configured media disk.');
@@ -31,6 +30,10 @@ class MediaRegistrar
         $metadata = $this->metadataReader->read($disk, $path);
         $media = $this->mediaRepository->findByLocation($disk, $path, withTrashed: true)
             ?? $this->mediaRepository->newRecord();
+
+        if (! $media->exists && $uuid !== null) {
+            $media->uuid = $uuid;
+        }
 
         if ($media->trashed()) {
             $media->restore();

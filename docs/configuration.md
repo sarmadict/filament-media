@@ -38,11 +38,10 @@ Set these before the package migration is run. Changing them after production da
 'upload' => [
     'disk' => env('FILAMENT_MEDIA_DISK', 'public'),
     'path' => env('FILAMENT_MEDIA_UPLOAD_PATH', 'uploads'),
+    'path_type' => env('FILAMENT_MEDIA_UPLOAD_PATH_TYPE', 'date'), // date, uuid_prefix, flat
+    'filename_type' => env('FILAMENT_MEDIA_FILENAME_TYPE', 'uuid'), // uuid, hash
     'visibility' => env('FILAMENT_MEDIA_VISIBILITY'),
-    'date_directories' => [
-        'enabled' => env('FILAMENT_MEDIA_DATE_DIRECTORIES', true),
-        'format' => env('FILAMENT_MEDIA_DATE_FORMAT', 'Y/m/d'),
-    ],
+    'date_format' => env('FILAMENT_MEDIA_DATE_FORMAT', 'Y/m/d'),
 ],
 ```
 
@@ -51,7 +50,7 @@ Set these before the package migration is run. Changing them after production da
 Default output:
 
 ```text
-uploads/2026/12/10/550e8400-e29b-41d4-a716-446655440000.jpg
+uploads/2026/12/10/019a1234-5678-7000-8000-123456789012.jpg
 ```
 
 To produce exactly a date-rooted layout:
@@ -63,14 +62,49 @@ FILAMENT_MEDIA_UPLOAD_PATH=
 Result:
 
 ```text
-2026/12/10/550e8400-e29b-41d4-a716-446655440000.jpg
+2026/12/10/019a1234-5678-7000-8000-123456789012.jpg
 ```
 
-To disable date directories:
+Choose the hierarchy independently of the filename:
+
+| `upload.path_type` | Layout |
+| --- | --- |
+| `date` | `{base}/{date format}/{filename}` |
+| `uuid_prefix` | `{base}/{media UUID first 2 characters}/{filename}` |
+| `flat` | `{base}/{filename}` |
+
+`upload.filename_type=uuid` uses the unique UUIDv7 saved in `media_files.uuid`. `hash` uses a random 40-character alphanumeric name, not a content checksum. Both append the lowercase extension and retain the client filename in `original_name`. The prefix directory always comes from the media UUID, even when the filename is a hash.
+
+Example UUID-prefix configuration:
 
 ```dotenv
-FILAMENT_MEDIA_DATE_DIRECTORIES=false
+FILAMENT_MEDIA_UPLOAD_PATH_TYPE=uuid_prefix
+FILAMENT_MEDIA_FILENAME_TYPE=uuid
 ```
+
+This produces `uploads/01/019a1234-5678-7000-8000-123456789012.jpg` for the UUID above. `flat` selects an exact custom directory without appending a hierarchy. Per-field overrides are documented in [media-picker.md](media-picker.md).
+
+`upload.path_type` is the single hierarchy setting and defaults to `date`. To store directly in the base directory:
+
+```dotenv
+FILAMENT_MEDIA_UPLOAD_PATH_TYPE=flat
+```
+
+`upload.date_format` (`FILAMENT_MEDIA_DATE_FORMAT`) applies only to `date` paths. For example, `Y/m` groups uploads by month.
+
+When upgrading, replace `FILAMENT_MEDIA_DATE_DIRECTORIES=false` with `FILAMENT_MEDIA_UPLOAD_PATH_TYPE=flat` and move a published `upload.date_directories.format` value to `upload.date_format`. The old date-directory settings are no longer read.
+
+Run `php artisan migrate` after upgrading to add/backfill UUIDs in existing media rows; existing file locations remain unchanged.
+
+## Picker defaults
+
+```php
+'picker' => [
+    'result_type' => 'id',
+],
+```
+
+Supported values are `id`, `media_id`, `uuid`, `file_name`, `path`, and `full_path`. ID remains the default; `media_id` aliases `id`, and `full_path` aliases the disk-relative `path`. Each field's `resultType()` takes precedence.
 
 ## Disk allow-list
 

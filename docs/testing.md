@@ -24,9 +24,14 @@ composer format:check
 
 - `UploadPathResolver` builds `base/Y/m/d` paths.
 - Empty upload base path produces `Y/m/d`.
-- Date directories can be disabled.
+- The `flat` path type disables hierarchy and ignores the date format.
 - Invalid relative path segments are rejected.
 - `FileUploader` stores a UUID filename and preserves `original_name` in the registry.
+- All date, UUID-prefix, and flat layouts work with both UUID and hash filenames.
+- The UUID upgrade migration backfills legacy and soft-deleted rows and enforces uniqueness.
+- Field upload overrides are isolated and cannot be changed by client requests.
+- All picker result types resolve saved selections, while inactive, deleted, and ambiguous selections are rejected.
+- Usage checks match the configured media attribute and optional disk column.
 - `MediaRegistrar` restores a soft-deleted record for an existing disk/path.
 - Files in use cannot be deleted.
 - Empty directories can be deleted while non-empty directories are protected.

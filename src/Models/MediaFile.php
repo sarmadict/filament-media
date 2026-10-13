@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class MediaFile extends Model
 {
@@ -14,6 +15,10 @@ class MediaFile extends Model
     protected static function booted(): void
     {
         static::creating(function (self $media): void {
+            if (blank($media->uuid)) {
+                $media->uuid = Str::uuid7()->toString();
+            }
+
             $userId = auth()->id();
 
             if ($media->created_by === null) {

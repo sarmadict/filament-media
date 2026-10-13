@@ -15,7 +15,15 @@ class MediaPicker extends Field
 {
     public const RESULT_ID = 'id';
 
+    public const RESULT_MEDIA_ID = 'media_id';
+
+    public const RESULT_UUID = 'uuid';
+
+    public const RESULT_FILE_NAME = 'file_name';
+
     public const RESULT_PATH = 'path';
+
+    public const RESULT_FULL_PATH = 'full_path';
 
     protected string $view = 'filament-media::forms.components.media-picker';
 
@@ -30,7 +38,63 @@ class MediaPicker extends Field
 
     protected bool|Closure $shouldSubmitParentFormOnSelection = false;
 
-    protected string|Closure $resultType = self::RESULT_ID;
+    protected string|Closure|null $resultType = null;
+
+    protected string|Closure|null $uploadPath = null;
+
+    protected string|Closure|null $uploadPathType = null;
+
+    protected string|Closure|null $uploadFilenameType = null;
+
+    protected string|Closure|null $uploadDateFormat = null;
+
+    public function uploadPath(string|Closure|null $path): static
+    {
+        $this->uploadPath = $path;
+
+        return $this;
+    }
+
+    public function getUploadPath(): ?string
+    {
+        return $this->evaluate($this->uploadPath);
+    }
+
+    public function uploadPathType(string|Closure|null $pathType): static
+    {
+        $this->uploadPathType = $pathType;
+
+        return $this;
+    }
+
+    public function getUploadPathType(): ?string
+    {
+        return $this->evaluate($this->uploadPathType);
+    }
+
+    public function uploadFilenameType(string|Closure|null $filenameType): static
+    {
+        $this->uploadFilenameType = $filenameType;
+
+        return $this;
+    }
+
+    public function getUploadFilenameType(): ?string
+    {
+        return $this->evaluate($this->uploadFilenameType);
+    }
+
+    public function uploadDateFormat(string|Closure|null $dateFormat): static
+    {
+        $this->uploadDateFormat = $dateFormat;
+
+        return $this;
+    }
+
+    public function getUploadDateFormat(): ?string
+    {
+        return $this->evaluate($this->uploadDateFormat);
+    }
 
     public function resultType(string|Closure $resultType): static
     {
@@ -41,13 +105,14 @@ class MediaPicker extends Field
 
     public function getResultType(): string
     {
-        $resultType = $this->evaluate($this->resultType);
+        $resultType = $this->evaluate($this->resultType)
+            ?? config('filament-media.picker.result_type', self::RESULT_ID);
+        $supported = [self::RESULT_ID, self::RESULT_MEDIA_ID, self::RESULT_UUID, self::RESULT_FILE_NAME, self::RESULT_PATH, self::RESULT_FULL_PATH];
 
-        if (! in_array($resultType, [self::RESULT_ID, self::RESULT_PATH], true)) {
+        if (! in_array($resultType, $supported, true)) {
             throw new InvalidArgumentException(sprintf(
-                'MediaPicker result type must be [%s] or [%s].',
-                self::RESULT_ID,
-                self::RESULT_PATH,
+                'MediaPicker result type must be one of [%s].',
+                implode(', ', $supported),
             ));
         }
 
@@ -155,10 +220,13 @@ class MediaPicker extends Field
 
         return [
             'id' => $media->getKey(),
+            'media_id' => $media->getKey(),
+            'uuid' => $media->uuid,
             'name' => $media->original_name ?: $media->file_name,
             'file_name' => $media->file_name,
             'disk' => $media->disk,
             'path' => $media->path,
+            'full_path' => $media->path,
             'mime_type' => $media->mime_type,
             'size' => FileType::humanSize((int) $media->size_bytes),
             'url' => FileType::isImageMime($media->mime_type)
@@ -172,7 +240,9 @@ class MediaPicker extends Field
         $state = $this->getState();
         $repository = app(MediaRepository::class);
 
-        if ($this->getResultType() === self::RESULT_ID) {
+        $resultType = $this->getResultType();
+
+        if (in_array($resultType, [self::RESULT_ID, self::RESULT_MEDIA_ID], true)) {
             return is_numeric($state)
                 ? $repository->findActiveById((int) $state)
                 : null;
@@ -180,6 +250,22 @@ class MediaPicker extends Field
 
         if (! is_string($state) || blank($state)) {
             return null;
+        }
+
+        if ($resultType === self::RESULT_UUID) {
+            return $repository->query()->where('uuid', $state)->where('state', true)->first();
+        }
+
+        if ($resultType === self::RESULT_FILE_NAME) {
+            // Legacy files may share a basename, even on the same disk.
+            $matches = $repository->query()
+                ->where('file_name', $state)
+                ->where('state', true)
+                ->whereIn('disk', $this->candidateDisks())
+                ->limit(2)
+                ->get();
+
+            return $matches->count() === 1 ? $matches->first() : null;
         }
 
         foreach ($this->candidateDisks() as $disk) {

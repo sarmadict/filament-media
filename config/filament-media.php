@@ -25,18 +25,20 @@ return [
     'upload' => [
         'disk' => env('FILAMENT_MEDIA_DISK', 'public'),
         'path' => env('FILAMENT_MEDIA_UPLOAD_PATH', 'uploads'),
+        'path_type' => env('FILAMENT_MEDIA_UPLOAD_PATH_TYPE', 'date'), // date, uuid_prefix, flat
+        'filename_type' => env('FILAMENT_MEDIA_FILENAME_TYPE', 'uuid'), // uuid, hash
         'visibility' => env('FILAMENT_MEDIA_VISIBILITY'),
-        'date_directories' => [
-            'enabled' => env('FILAMENT_MEDIA_DATE_DIRECTORIES', true),
-            'format' => env('FILAMENT_MEDIA_DATE_FORMAT', 'Y/m/d'),
-        ],
+        'date_format' => env('FILAMENT_MEDIA_DATE_FORMAT', 'Y/m/d'),
+    ],
+
+    'picker' => [
+        'result_type' => 'id', // id (or media_id), uuid, file_name, path (or full_path)
     ],
 
     'disks' => [
         // Empty means every filesystem disk configured by the host application.
         'allowed' => [],
     ],
-
 
     'ui' => [
         // null: infer RTL for common RTL locales and LTR otherwise.
@@ -63,7 +65,7 @@ return [
     'usage' => [
         'resolver' => ConfigurableMediaUsageResolver::class,
         'check_attachments' => true,
-        // Each item: ['model' => Model::class, 'column' => 'media_id', 'label' => 'Translation key or label'].
+        // Each item: model, column, label; optional media_attribute (default id) and disk_column.
         'direct_references' => [],
     ],
 ];

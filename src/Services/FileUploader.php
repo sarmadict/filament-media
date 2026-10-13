@@ -5,6 +5,7 @@ namespace Sarmadict\FilamentMedia\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use RuntimeException;
 use Sarmadict\FilamentMedia\Models\MediaFile;
 use Sarmadict\FilamentMedia\Support\Disk;
@@ -12,14 +13,23 @@ use Throwable;
 
 class FileUploader
 {
+    public const FILENAME_UUID = 'uuid';
+
+    public const FILENAME_HASH = 'hash';
+
     public function __construct(
         private readonly MediaRegistrar $mediaRegistrar,
         private readonly UploadPathResolver $uploadPathResolver,
-    ) {
-    }
+    ) {}
 
-    public function upload(UploadedFile $file, ?string $disk = null, ?string $directory = null): MediaFile
-    {
+    public function upload(
+        UploadedFile $file,
+        ?string $disk = null,
+        ?string $directory = null,
+        ?string $pathType = null,
+        ?string $filenameType = null,
+        ?string $dateFormat = null,
+    ): MediaFile {
         $uploadDisk = Disk::upload();
 
         if ($disk !== null && $disk !== $uploadDisk) {
@@ -27,9 +37,22 @@ class FileUploader
         }
 
         $disk = $uploadDisk;
-        $directory = $this->uploadPathResolver->resolve($directory);
+        $uuid = Str::uuid7()->toString();
+        $directory = $this->uploadPathResolver->resolve(
+            basePath: $directory,
+            uuid: $uuid,
+            pathType: $pathType,
+            dateFormat: $dateFormat,
+        );
+        $filenameType ??= (string) config('filament-media.upload.filename_type', self::FILENAME_UUID);
+
+        if (! in_array($filenameType, [self::FILENAME_UUID, self::FILENAME_HASH], true)) {
+            throw new InvalidArgumentException('Upload filename type must be uuid or hash.');
+        }
+
         $extension = strtolower((string) $file->getClientOriginalExtension());
-        $fileName = Str::uuid()->toString().($extension !== '' ? ".{$extension}" : '');
+        $name = $filenameType === self::FILENAME_UUID ? $uuid : Str::random(40);
+        $fileName = $name.($extension !== '' ? ".{$extension}" : '');
         $visibility = $this->visibility($disk);
 
         $path = Storage::disk($disk)->putFileAs(
@@ -48,6 +71,7 @@ class FileUploader
                 $disk,
                 $path,
                 $file->getClientOriginalName(),
+                $uuid,
             );
         } catch (Throwable $exception) {
             Storage::disk($disk)->delete($path);

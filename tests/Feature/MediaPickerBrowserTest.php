@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Sarmadict\FilamentMedia\Livewire\MediaPickerBrowser;
 use Sarmadict\FilamentMedia\Models\MediaFile;
@@ -32,9 +33,50 @@ it('includes the media id and path in the selection payload', function (): void 
             'filament-media-selected',
             fn (string $event, array $parameters): bool => $parameters['id'] === $media->getKey()
                 && $parameters['media']['id'] === $media->getKey()
-                && $parameters['media']['path'] === $media->path,
+                && $parameters['media']['media_id'] === $media->getKey()
+                && $parameters['media']['uuid'] === $media->uuid
+                && $parameters['media']['file_name'] === $media->file_name
+                && $parameters['media']['path'] === $media->path
+                && $parameters['media']['full_path'] === $media->path,
         );
 });
+
+it('keeps field upload overrides isolated between pickers', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    config()->set('filament-media.upload.path_type', 'uuid_prefix');
+    config()->set('filament-media.upload.filename_type', 'uuid');
+    Storage::fake('public');
+
+    Livewire::test(MediaPickerBrowser::class, [
+        'pickerId' => 'custom-picker',
+        'uploadPath' => 'posts/covers',
+        'uploadPathType' => 'flat',
+        'uploadFilenameType' => 'hash',
+    ])->set('uploads', [UploadedFile::fake()->createWithContent('custom.txt', 'Custom.')])
+        ->call('storeUploads')->assertHasNoErrors();
+
+    Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'default-picker'])
+        ->set('uploads', [UploadedFile::fake()->createWithContent('default.txt', 'Default.')])
+        ->call('storeUploads')->assertHasNoErrors();
+
+    $custom = MediaFile::query()->where('original_name', 'custom.txt')->firstOrFail();
+    $default = MediaFile::query()->where('original_name', 'default.txt')->firstOrFail();
+
+    expect($custom->path)->toBe('posts/covers/'.$custom->file_name)
+        ->and($custom->file_name)->toMatch('/^[a-zA-Z0-9]{40}\.txt$/')
+        ->and($default->path)->toBe('uploads/'.substr($default->uuid, 0, 2).'/'.$default->uuid.'.txt');
+
+    Storage::disk('public')->assertExists([$custom->path, $default->path]);
+});
+
+it('prevents clients from changing configured upload overrides', function (string $property): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+
+    Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'locked-picker'])
+        ->set($property, 'client-override');
+})->with(['uploadPath', 'uploadPathType', 'uploadFilenameType', 'uploadDateFormat'])
+    ->throws(CannotUpdateLockedPropertyException::class);
 
 it('keeps upload readiness separate from the save loading state', function (): void {
     config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));

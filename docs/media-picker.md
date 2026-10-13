@@ -1,6 +1,6 @@
 # MediaPicker
 
-`MediaPicker` is a Filament form field whose state can be a `media_files.id` value or a disk-relative file path. Media ID is the default for backward compatibility.
+`MediaPicker` stores an active registered media selection as a numeric ID, UUID, filename, or complete disk-relative path. Media ID remains the default.
 
 ```php
 use Sarmadict\FilamentMedia\Filament\Forms\Components\MediaPicker;
@@ -26,9 +26,57 @@ MediaPicker::make('cover_path')
     ->disk('public');
 ```
 
-The path is relative to its Laravel filesystem disk; it is not an absolute path or public URL. Specifying `disk()` is recommended for path-backed fields because paths are only unique within a disk. Without it, the configured default disk is checked first and the remaining allowed disks are checked in configuration order when an existing value is loaded.
+| Constant | Value saved on the application field |
+| --- | --- |
+| `RESULT_ID` / `RESULT_MEDIA_ID` | Numeric `media_files.id` |
+| `RESULT_UUID` | Unique `media_files.uuid` (UUIDv7) |
+| `RESULT_FILE_NAME` | `media_files.file_name`, including extension |
+| `RESULT_PATH` / `RESULT_FULL_PATH` | `media_files.path`, including directories and filename |
 
-Use a nullable string column with room for the package's 700-character `media_files.path` value (for example, `$table->string('cover_path', 700)->nullable()`). Path-backed fields are not foreign keys and must not be listed under `usage.direct_references`. They also do not receive automatic updates when a registered file is moved or its directory is renamed. Prefer the default ID result when the application needs a stable relationship to the media record.
+`RESULT_MEDIA_ID` aliases the existing `RESULT_ID` behavior. `RESULT_FULL_PATH` aliases `RESULT_PATH`: the complete path is relative to the Laravel filesystem disk, not an absolute path or public URL. The `filament-media.picker.result_type` setting changes the application default; `resultType()` overrides it and may accept a closure.
+
+For example:
+
+```php
+MediaPicker::make('cover_uuid')->resultType(MediaPicker::RESULT_UUID);
+MediaPicker::make('asset_name')->resultType(MediaPicker::RESULT_FILE_NAME)->disk('public');
+MediaPicker::make('document_path')->resultType(MediaPicker::RESULT_FULL_PATH)->disk('public');
+```
+
+Use a UUID/36-character string column for UUIDs, a string of up to 255 characters for filenames, and a string with room for the 700-character path value for paths. Optional selections should use nullable columns.
+
+Specifying `disk()` is recommended for filename- and path-backed fields. Without it, paths resolve against the configured default disk first, followed by other allowed disks. Filename resolution requires exactly one active match on the field disk (or across all allowed disks when unset); ambiguous legacy filenames show no selection. Filename and path values are not updated automatically after moves or renames. Prefer IDs or UUIDs for stable references, and configure [deletion protection](deletion-protection.md) with the matching `media_attribute` for every stored reference.
+
+## Per-field uploads
+
+Each setting inherits the global upload configuration unless overridden. Combine different layouts and filename types within one form or application:
+
+```php
+MediaPicker::make('cover_uuid')
+    ->images()
+    ->resultType(MediaPicker::RESULT_UUID)
+    ->uploadPath('posts/covers')
+    ->uploadPathType('uuid_prefix')
+    ->uploadFilenameType('uuid');
+
+MediaPicker::make('document_path')
+    ->documents()
+    ->disk('public')
+    ->resultType(MediaPicker::RESULT_FULL_PATH)
+    ->uploadPath('documents')
+    ->uploadPathType('date')
+    ->uploadDateFormat('Y/m')
+    ->uploadFilenameType('hash');
+
+MediaPicker::make('avatar_media_id')
+    ->images()
+    ->uploadPath('profiles/avatars')
+    ->uploadPathType('flat');
+```
+
+`uploadPath()` supplies the base directory. `uploadPathType()` accepts `date`, `uuid_prefix`, or `flat`; use `flat` for an exact custom directory without appended hierarchy. `uploadFilenameType()` accepts `uuid` or `hash`. `uploadDateFormat()` supplies a PHP date format, used only for `date` paths. These methods accept strings, closures evaluated in the Filament field context, or null to inherit the corresponding global setting. An empty upload path explicitly selects the disk root.
+
+These options affect new uploads from that field, including inline pickers; selecting an existing file preserves its filename and location. Upload options and result type are independent. A field that stores UUIDs can upload hash-named files, and a field that stores IDs can upload UUID-named files. The standalone media library continues to use global settings.
 
 ## MIME presets
 
@@ -66,7 +114,7 @@ MediaPicker::make('asset_media_id')
     ]);
 ```
 
-The picker only returns active registered media. Uploads initiated inside the picker use the package-configured disk/path behavior and are registered immediately.
+The picker only returns active registered media. Uploads use the configured media disk and the field's upload settings with global fallback, and are registered immediately.
 
 ## Database relationship for ID results
 
@@ -83,3 +131,12 @@ public function coverMedia(): BelongsTo
 ```
 
 If the host uses a custom model class, use that configured subclass in the relation.
+
+For UUID results, specify the owner key:
+
+```php
+public function coverMedia(): BelongsTo
+{
+    return $this->belongsTo(MediaFile::class, 'cover_uuid', 'uuid');
+}
+```

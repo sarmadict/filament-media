@@ -38,14 +38,32 @@ class ConfigurableMediaUsageResolver implements MediaUsageResolver
             }
 
             /** @var Model $model */
-            $model = new $modelClass();
+            $model = new $modelClass;
             $query = $modelClass::query();
 
             if (in_array(SoftDeletes::class, class_uses_recursive($model), true)) {
                 $query->withTrashed();
             }
 
-            $count = $query->where($column, $media->getKey())->count();
+            $attribute = $reference['media_attribute'] ?? 'id';
+
+            if (! in_array($attribute, ['id', 'media_id', 'uuid', 'file_name', 'path', 'full_path'], true)) {
+                continue;
+            }
+
+            $value = match ($attribute) {
+                'id', 'media_id' => $media->getKey(),
+                'full_path' => $media->path,
+                default => $media->getAttribute($attribute),
+            };
+
+            $query->where($column, $value);
+
+            if (is_string($reference['disk_column'] ?? null) && $reference['disk_column'] !== '') {
+                $query->where($reference['disk_column'], $media->disk);
+            }
+
+            $count = $query->count();
 
             if ($count === 0) {
                 continue;

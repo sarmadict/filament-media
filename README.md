@@ -10,7 +10,9 @@ A reusable media library for Laravel and Filament 5. It provides:
 - safe file deletion with configurable usage checks;
 - directory browsing, creation, rename, deletion, and registration;
 - configurable disks and authorization;
-- configurable date-based upload paths such as `media/2026/12/10/<uuid>.jpg`.
+- time-ordered UUIDs with date, UUID-prefix, or custom upload directories;
+- UUID or hash filenames, configurable globally and per field;
+- picker results stored as media IDs, UUIDs, filenames, or complete paths.
 
 ## Install
 
@@ -50,6 +52,19 @@ MediaPicker::make('cover_path')
     ->disk('public');
 ```
 
-The default upload path is `media/{Y}/{m}/{d}`. Set `FILAMENT_MEDIA_UPLOAD_PATH=` to store directly under `{Y}/{m}/{d}`.
+Configure a field independently of application defaults:
+
+```php
+MediaPicker::make('cover_uuid')
+    ->images()
+    ->resultType(MediaPicker::RESULT_UUID)
+    ->uploadPath('posts/covers')
+    ->uploadPathType('uuid_prefix')
+    ->uploadFilenameType('uuid');
+```
+
+The default upload path is `uploads/{Y}/{m}/{d}/{uuid}.{extension}`. Set `FILAMENT_MEDIA_UPLOAD_PATH_TYPE=uuid_prefix` for `uploads/{uuid first 2 characters}/{filename}`, or `flat` for an exact base directory. `FILAMENT_MEDIA_FILENAME_TYPE` chooses `uuid` (default) or `hash`. Set `FILAMENT_MEDIA_UPLOAD_PATH=` for an empty base directory.
+
+Run `php artisan migrate` after upgrading to add UUIDs to existing media rows. Existing files retain their locations and filenames.
 
 See [docs/index.md](docs/index.md) for the complete documentation.

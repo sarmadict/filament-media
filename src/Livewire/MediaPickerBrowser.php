@@ -5,6 +5,7 @@ namespace Sarmadict\FilamentMedia\Livewire;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -40,16 +41,36 @@ class MediaPickerBrowser extends Component
     /** @var array<int, mixed> */
     public array $uploads = [];
 
+    #[Locked]
+    public ?string $uploadPath = null;
+
+    #[Locked]
+    public ?string $uploadPathType = null;
+
+    #[Locked]
+    public ?string $uploadFilenameType = null;
+
+    #[Locked]
+    public ?string $uploadDateFormat = null;
+
     public function mount(
         string $pickerId,
         array $acceptedMimeTypes = [],
         int|string|null $initialId = null,
         ?string $disk = null,
         ?string $initialDisk = null,
+        ?string $uploadPath = null,
+        ?string $uploadPathType = null,
+        ?string $uploadFilenameType = null,
+        ?string $uploadDateFormat = null,
     ): void {
         $this->pickerId = $pickerId;
         $this->acceptedMimeTypes = array_values($acceptedMimeTypes);
         $this->selectedId = is_numeric($initialId) ? (int) $initialId : null;
+        $this->uploadPath = $uploadPath;
+        $this->uploadPathType = $uploadPathType;
+        $this->uploadFilenameType = $uploadFilenameType;
+        $this->uploadDateFormat = $uploadDateFormat;
 
         if ($disk !== null) {
             abort_unless(in_array($disk, Disk::all(), true), 404);
@@ -153,7 +174,13 @@ class MediaPickerBrowser extends Component
             }
 
             try {
-                $lastMedia = app(FileUploader::class)->upload($file);
+                $lastMedia = app(FileUploader::class)->upload(
+                    $file,
+                    directory: $this->uploadPath,
+                    pathType: $this->uploadPathType,
+                    filenameType: $this->uploadFilenameType,
+                    dateFormat: $this->uploadDateFormat,
+                );
             } catch (Throwable $exception) {
                 report($exception);
 
@@ -261,10 +288,13 @@ class MediaPickerBrowser extends Component
     {
         return [
             'id' => (int) $media->getKey(),
+            'media_id' => (int) $media->getKey(),
+            'uuid' => $media->uuid,
             'name' => $media->original_name ?: $media->file_name,
             'file_name' => $media->file_name,
             'disk' => $media->disk,
             'path' => $media->path,
+            'full_path' => $media->path,
             'mime_type' => $media->mime_type,
             'size' => FileType::humanSize((int) $media->size_bytes),
             'extension' => $media->extension,
