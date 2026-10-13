@@ -43,6 +43,16 @@ use Sarmadict\FilamentMedia\Filament\Forms\Components\MediaPicker;
 MediaPicker::make('cover_media_id')->images();
 ```
 
+Set `picker.modal_width` in the config or override it per field with Filament's `Width` enum:
+
+```php
+use Filament\Support\Enums\Width;
+
+MediaPicker::make('cover_media_id')->images()->modalWidth(Width::Screen);
+```
+
+The default `normal` preserves the current size. `screen` fills the viewport with a small margin; standard widths such as `5xl` / `Width::FiveExtraLarge` are also supported.
+
 Store the disk-relative file path instead of the media ID when needed:
 
 ```php

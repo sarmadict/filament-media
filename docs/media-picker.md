@@ -9,6 +9,22 @@ MediaPicker::make('cover_media_id')
     ->label('Cover');
 ```
 
+## Modal size
+
+The picker inherits `filament-media.picker.modal_width`, which defaults to `normal` to preserve the current size. Override it per field using Filament's [modal width convention](https://filamentphp.com/docs/5.x/actions/modals#changing-the-modal-width):
+
+```php
+use Filament\Support\Enums\Width;
+
+MediaPicker::make('cover_media_id')->modalWidth(Width::Screen);
+MediaPicker::make('document_media_id')->modalWidth(Width::FiveExtraLarge);
+MediaPicker::make('avatar_media_id')->modalWidth('normal');
+```
+
+`Width::Screen` (or `'screen'`) fills the viewport's width and height, leaving a 12px margin on desktop and 7px on small screens. Other supported widths are `xs`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `4xl`, `5xl`, `6xl`, and `7xl`, or their corresponding `Width` enum cases. These follow Tailwind's maximum-width scale and keep the normal modal height. Smaller viewports constrain the width to fit.
+
+`modalWidth()` also accepts a closure evaluated in the Filament field context. Passing null, calling `modalWidth()` without an argument, or returning null from a closure inherits the config default. Modal sizing does not affect inline pickers.
+
 ## Result type
 
 Store the registered media ID (the default):

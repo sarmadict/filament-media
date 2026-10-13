@@ -33,6 +33,7 @@ return [
 
     'picker' => [
         'result_type' => 'id', // id (or media_id), uuid, file_name, path (or full_path)
+        'modal_width' => 'normal', // normal, xs through 7xl, screen
     ],
 
     'disks' => [

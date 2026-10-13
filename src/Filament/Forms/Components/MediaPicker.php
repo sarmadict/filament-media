@@ -4,6 +4,7 @@ namespace Sarmadict\FilamentMedia\Filament\Forms\Components;
 
 use Closure;
 use Filament\Forms\Components\Field;
+use Filament\Support\Enums\Width;
 use InvalidArgumentException;
 use Sarmadict\FilamentMedia\Contracts\MediaRepository;
 use Sarmadict\FilamentMedia\Contracts\PreviewUrlResolver;
@@ -13,6 +14,22 @@ use Sarmadict\FilamentMedia\Support\FileType;
 
 class MediaPicker extends Field
 {
+    protected const MODAL_WIDTHS = [
+        'normal' => '1180px',
+        'xs' => '20rem',
+        'sm' => '24rem',
+        'md' => '28rem',
+        'lg' => '32rem',
+        'xl' => '36rem',
+        '2xl' => '42rem',
+        '3xl' => '48rem',
+        '4xl' => '56rem',
+        '5xl' => '64rem',
+        '6xl' => '72rem',
+        '7xl' => '80rem',
+        'screen' => '100%',
+    ];
+
     public const RESULT_ID = 'id';
 
     public const RESULT_MEDIA_ID = 'media_id';
@@ -38,6 +55,8 @@ class MediaPicker extends Field
 
     protected bool|Closure $shouldSubmitParentFormOnSelection = false;
 
+    protected Width|string|Closure|null $modalWidth = null;
+
     protected string|Closure|null $resultType = null;
 
     protected string|Closure|null $uploadPath = null;
@@ -47,6 +66,37 @@ class MediaPicker extends Field
     protected string|Closure|null $uploadFilenameType = null;
 
     protected string|Closure|null $uploadDateFormat = null;
+
+    public function modalWidth(Width|string|Closure|null $width = null): static
+    {
+        $this->modalWidth = $width;
+
+        return $this;
+    }
+
+    public function getModalWidth(): string
+    {
+        $width = $this->evaluate($this->modalWidth)
+            ?? config('filament-media.picker.modal_width', 'normal');
+
+        if ($width instanceof Width) {
+            $width = $width->value;
+        }
+
+        if (! is_string($width) || ! array_key_exists($width, self::MODAL_WIDTHS)) {
+            throw new InvalidArgumentException(sprintf(
+                'MediaPicker modal width must be one of [%s].',
+                implode(', ', array_keys(self::MODAL_WIDTHS)),
+            ));
+        }
+
+        return $width;
+    }
+
+    public function getModalMaxWidth(): string
+    {
+        return self::MODAL_WIDTHS[$this->getModalWidth()];
+    }
 
     public function uploadPath(string|Closure|null $path): static
     {

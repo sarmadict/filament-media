@@ -101,10 +101,13 @@ Run `php artisan migrate` after upgrading to add/backfill UUIDs in existing medi
 ```php
 'picker' => [
     'result_type' => 'id',
+    'modal_width' => 'normal',
 ],
 ```
 
 Supported values are `id`, `media_id`, `uuid`, `file_name`, `path`, and `full_path`. ID remains the default; `media_id` aliases `id`, and `full_path` aliases the disk-relative `path`. Each field's `resultType()` takes precedence.
+
+`modal_width` defaults to `normal`, preserving the current picker dimensions. Use `screen` for a full-screen picker with a small margin, or a Filament modal width (`xs`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `4xl`, `5xl`, `6xl`, `7xl`). Corresponding `Filament\Support\Enums\Width` cases also work, including `Width::Screen`. Each field's `modalWidth()` takes precedence; see [modal sizing](media-picker.md#modal-size) for examples. Inline pickers retain their existing layout.
 
 ## Disk allow-list
 

@@ -116,8 +116,14 @@
         </div>
 
         @unless ($isDisabled())
+            @php
+                $modalWidth = $getModalWidth();
+            @endphp
             <div
-                    class="filament-media-picker-modal"
+                    @class([
+                        'filament-media-picker-modal',
+                        'filament-media-picker-modal--screen' => $modalWidth === 'screen',
+                    ])
                     x-show="open"
                     x-cloak
                     x-transition.opacity
@@ -127,7 +133,11 @@
                     aria-label="{{ __('filament-media::media-library.picker_title') }}"
                 >
                     <div class="filament-media-picker-modal__backdrop" @click="open = false"></div>
-                    <div class="filament-media-picker-modal__panel" @click.stop>
+                    <div
+                        class="filament-media-picker-modal__panel"
+                        style="--filament-media-picker-modal-width: {{ $getModalMaxWidth() }}"
+                        @click.stop
+                    >
                         <div class="filament-media-picker-modal__header">
                             <div>
                                 <h2>{{ __('filament-media::media-library.picker_title') }}</h2>
@@ -151,7 +161,7 @@
         <style>
             [x-cloak] { display: none !important; }
             .filament-media-picker-field { width: 100%; }
-            .filament-media-picker-field--inline { height: min(68vh, 680px); min-height: 520px; overflow: hidden; border: 1px solid rgb(229 231 235); border-radius: 12px; }
+            .filament-media-picker-field--inline { height: min(68vh, 680px); min-height: 520px; overflow: hidden; border: 1px solid rgb(229 231 235); border-radius: 12px; container: filament-media-picker / inline-size; }
             .dark .filament-media-picker-field--inline { border-color: rgb(55 65 81); }
             .filament-media-picker-field__selection { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px; border: 1px solid rgb(229 231 235); border-radius: 12px; background: rgb(249 250 251); }
             .dark .filament-media-picker-field__selection { background: rgb(31 41 55); border-color: rgb(75 85 99); }
@@ -176,7 +186,8 @@
             .filament-media-picker-field__empty > span { font-size: 12px; }
             .filament-media-picker-modal { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 22px; direction: rtl; }
             .filament-media-picker-modal__backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / .72); backdrop-filter: blur(2px); }
-            .filament-media-picker-modal__panel { position: relative; width: min(1180px, 96vw); height: min(760px, 92vh); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgb(75 85 99 / .55); border-radius: 15px; background: white; box-shadow: 0 24px 70px rgb(0 0 0 / .35); }
+            .filament-media-picker-modal__panel { position: relative; width: min(var(--filament-media-picker-modal-width, 1180px), 96vw); max-width: 100%; height: min(760px, 92vh); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgb(75 85 99 / .55); border-radius: 15px; background: white; box-shadow: 0 24px 70px rgb(0 0 0 / .35); }
+            .filament-media-picker-modal--screen .filament-media-picker-modal__panel { position: absolute; inset: 12px; width: auto; height: auto; }
             .dark .filament-media-picker-modal__panel { background: rgb(17 24 39); }
             .filament-media-picker-modal__header { min-height: 76px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid rgb(229 231 235); }
             .dark .filament-media-picker-modal__header { border-color: rgb(55 65 81); }
@@ -187,14 +198,15 @@
             .filament-media-picker-modal__header button:hover { background: rgb(243 244 246); }
             .dark .filament-media-picker-modal__header button:hover { background: rgb(31 41 55); }
             .filament-media-picker-modal__header svg { width: 20px; height: 20px; }
-            .filament-media-picker-modal__content { min-height: 0; overflow: hidden; }
+            .filament-media-picker-modal__content { min-height: 0; overflow: hidden; container: filament-media-picker / inline-size; }
             @media (max-width: 720px) {
                 .filament-media-picker-field--inline { height: 72vh; min-height: 460px; }
                 .filament-media-picker-field__selection { grid-template-columns: 62px minmax(0, 1fr); }
                 .filament-media-picker-field__preview { width: 62px; height: 56px; }
                 .filament-media-picker-field__actions { grid-column: 1 / -1; }
                 .filament-media-picker-modal { padding: 7px; }
-                .filament-media-picker-modal__panel { width: 100%; height: 96vh; }
+                .filament-media-picker-modal__panel { width: min(var(--filament-media-picker-modal-width, 100%), 100%); height: 96vh; }
+                .filament-media-picker-modal--screen .filament-media-picker-modal__panel { inset: 7px; }
             }
         </style>
     @endonce

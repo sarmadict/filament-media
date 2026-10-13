@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added configurable picker modal widths globally and per field, using Filament's width scale and a full-screen option with edge margins.
 - Added unique time-ordered UUIDv7 values to media records, with an upgrade migration that backfills existing and soft-deleted rows.
 - Added independent date, UUID-prefix, and flat upload layouts and UUID/hash filename strategies, with per-field path and naming overrides.
 - Replaced the date-directory toggle with a single `upload.path_type` setting and moved the date format to `upload.date_format`.

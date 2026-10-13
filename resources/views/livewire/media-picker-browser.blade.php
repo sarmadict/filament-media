@@ -276,6 +276,14 @@
                 .filament-media-picker-browser__body { padding: 10px; }
                 .filament-media-picker-browser__footer { padding: 8px 10px; }
             }
+            @container filament-media-picker (max-width: 700px) {
+                .filament-media-picker-browser__toolbar { grid-template-columns: 1fr; }
+                .filament-media-picker-browser__workspace { display: block; overflow-y: auto; }
+                .filament-media-picker-browser__details { display: none; }
+                .filament-media-picker-browser__body { overflow: visible; padding: 10px; }
+                .filament-media-picker-browser__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                .filament-media-picker-browser__footer { padding: 8px 10px; }
+            }
         </style>
     @endonce
 </div>
