@@ -41,6 +41,101 @@ it('includes the media id and path in the selection payload', function (): void 
         );
 });
 
+it('plays selected video and audio in the sidebar and updates the preview when selection changes', function (string $mimeType, string $extension, string $tag): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filesystems.disks.public.visibility', 'public');
+    Storage::fake('public');
+
+    $mediaFiles = collect(['first', 'second'])->map(function (string $name) use ($mimeType, $extension): MediaFile {
+        $fileName = $name.'.'.$extension;
+        $path = 'uploads/'.$fileName;
+        Storage::disk('public')->put($path, 'Preview content.');
+
+        $media = new MediaFile;
+        $media->forceFill([
+            'disk' => 'public',
+            'path' => $path,
+            'original_name' => $fileName,
+            'file_name' => $fileName,
+            'mime_type' => $mimeType,
+            'size_bytes' => 1024,
+            'state' => true,
+        ])->save();
+
+        return $media;
+    });
+
+    $picker = Livewire::test(MediaPickerBrowser::class, [
+        'pickerId' => 'playback-picker',
+        'disk' => 'public',
+    ]);
+
+    $document = new DOMDocument;
+    @$document->loadHTML($picker->html());
+    expect((new DOMXPath($document))->query('//video | //audio'))->toHaveCount(0);
+
+    $previewKeys = [];
+
+    foreach ($mediaFiles as $media) {
+        $picker->call('select', $media->getKey())->assertSet('selectedId', $media->getKey());
+
+        @$document->loadHTML($picker->html());
+        $xpath = new DOMXPath($document);
+        $players = $xpath->query('//aside//'.$tag);
+        $player = $players->item(0);
+
+        expect($players)->toHaveCount(1)
+            ->and($xpath->query('//video | //audio'))->toHaveCount(1)
+            ->and($player->getAttribute('src'))->toBe(Storage::disk('public')->url($media->path))
+            ->and($player->hasAttribute('controls'))->toBeTrue()
+            ->and($player->getAttribute('preload'))->toBe('metadata')
+            ->and($player->hasAttribute('autoplay'))->toBeFalse();
+
+        $previewKeys[] = $player->parentNode->getAttribute('wire:key');
+    }
+
+    expect($previewKeys[0])->not->toBe($previewKeys[1]);
+
+    $picker->call('confirmSelection')->assertDispatched(
+        'filament-media-selected',
+        fn (string $event, array $parameters): bool => $parameters['media']['url'] === null,
+    );
+})->with([
+    'video' => ['video/mp4', 'mp4', 'video'],
+    'audio' => ['audio/mpeg', 'mp3', 'audio'],
+]);
+
+it('keeps the sidebar icon when selected video or audio has no preview URL', function (string $mimeType, string $extension): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    Storage::fake('public');
+
+    $media = new MediaFile;
+    $media->forceFill([
+        'disk' => 'public',
+        'path' => 'uploads/missing.'.$extension,
+        'original_name' => 'missing.'.$extension,
+        'file_name' => 'missing.'.$extension,
+        'mime_type' => $mimeType,
+        'size_bytes' => 1024,
+        'state' => true,
+    ])->save();
+
+    $picker = Livewire::test(MediaPickerBrowser::class, [
+        'pickerId' => 'missing-preview-picker',
+        'disk' => 'public',
+    ])->call('select', $media->getKey());
+
+    $document = new DOMDocument;
+    @$document->loadHTML($picker->html());
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//video | //audio'))->toHaveCount(0)
+        ->and($xpath->query('//aside//div[@class="filament-media-picker-details__preview"]//svg'))->toHaveCount(1);
+})->with([
+    'video' => ['video/mp4', 'mp4'],
+    'audio' => ['audio/mpeg', 'mp3'],
+]);
+
 it('keeps field upload overrides isolated between pickers', function (): void {
     config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
     config()->set('filament-media.authorization.enabled', false);

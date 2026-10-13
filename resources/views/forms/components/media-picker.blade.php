@@ -63,6 +63,9 @@
             resultType: @js($resultType),
             selected: @js($selectedMedia),
         }"
+        x-init="$watch('open', (isOpen) => {
+            if (!isOpen) $el.querySelectorAll('video, audio').forEach((player) => player.pause());
+        })"
         @filament-media-selected.window="
             if ($event.detail.pickerId !== pickerId) return;
             state = $event.detail.media[resultType];

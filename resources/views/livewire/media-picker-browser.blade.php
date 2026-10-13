@@ -137,9 +137,13 @@
                         $selectedIsAudio = \Sarmadict\FilamentMedia\Support\FileType::isAudioMime($selectedMedia['mime_type']);
                     @endphp
 
-                    <div class="filament-media-picker-details__preview">
+                    <div class="filament-media-picker-details__preview" wire:key="picker-preview-{{ $selectedMedia['id'] }}">
                         @if ($selectedIsImage && $selectedMedia['url'])
                             <img src="{{ $selectedMedia['url'] }}" alt="">
+                        @elseif ($selectedIsVideo && $selectedMedia['preview_url'])
+                            <video src="{{ $selectedMedia['preview_url'] }}" controls playsinline preload="metadata" aria-label="{{ $selectedMedia['name'] }}"></video>
+                        @elseif ($selectedIsAudio && $selectedMedia['preview_url'])
+                            <audio src="{{ $selectedMedia['preview_url'] }}" controls preload="metadata" aria-label="{{ $selectedMedia['name'] }}"></audio>
                         @elseif ($selectedIsVideo)
                             <x-filament::icon icon="heroicon-o-film" />
                         @elseif ($selectedIsAudio)
@@ -223,7 +227,8 @@
             .dark .filament-media-picker-browser__details { border-color: rgb(55 65 81); background: rgb(17 24 39); }
             .filament-media-picker-details__preview { height: 180px; display: grid; place-items: center; overflow: hidden; border: 1px solid rgb(229 231 235); border-radius: 10px; background: white; }
             .dark .filament-media-picker-details__preview { background: rgb(31 41 55); border-color: rgb(55 65 81); }
-            .filament-media-picker-details__preview img { width: 100%; height: 100%; object-fit: contain; }
+            .filament-media-picker-details__preview img, .filament-media-picker-details__preview video { width: 100%; height: 100%; object-fit: contain; }
+            .filament-media-picker-details__preview video, .filament-media-picker-details__preview audio { min-width: 0; width: 100%; direction: ltr; }
             .filament-media-picker-details__preview svg { width: 54px; height: 54px; color: rgb(107 114 128); }
             .filament-media-picker-details__name { display: block; margin-top: 12px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
             .filament-media-picker-details__list { display: grid; gap: 9px; margin-top: 14px; }

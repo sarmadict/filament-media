@@ -256,7 +256,18 @@ class MediaPickerBrowser extends Component
 
         $media = $this->baseQuery()->whereKey($this->selectedId)->first();
 
-        return $media !== null ? $this->mediaData($media) : null;
+        if ($media === null) {
+            return null;
+        }
+
+        $mediaData = $this->mediaData($media);
+        $mediaData['preview_url'] = $mediaData['url'];
+
+        if (FileType::isVideoMime($media->mime_type) || FileType::isAudioMime($media->mime_type)) {
+            $mediaData['preview_url'] = app(PreviewUrlResolver::class)->forMedia($media);
+        }
+
+        return $mediaData;
     }
 
     private function mediaItems(): LengthAwarePaginator
