@@ -14,6 +14,7 @@ use Sarmadict\FilamentMedia\Contracts\PreviewUrlResolver;
 use Sarmadict\FilamentMedia\Models\MediaFile;
 use Sarmadict\FilamentMedia\Services\AuthorizationManager;
 use Sarmadict\FilamentMedia\Services\FileUploader;
+use Sarmadict\FilamentMedia\Services\TemporaryUploadCleaner;
 use Sarmadict\FilamentMedia\Support\Disk;
 use Sarmadict\FilamentMedia\Support\FileType;
 use Throwable;
@@ -104,6 +105,11 @@ class MediaPickerBrowser extends Component
         $this->resetPage('mediaPickerPage');
     }
 
+    public function updatedUploads(): void
+    {
+        $this->storeUploads();
+    }
+
     public function select(int $id): void
     {
         $media = $this->baseQuery()->whereKey($id)->first();
@@ -157,23 +163,25 @@ class MediaPickerBrowser extends Component
             return;
         }
 
+        $this->resetValidation();
+        $this->tab = 'upload';
         $lastMedia = null;
 
         foreach ($this->uploads as $file) {
-            $mimeType = method_exists($file, 'getMimeType') ? $file->getMimeType() : null;
-
-            if (! FileType::mimeMatches($mimeType, $this->acceptedMimeTypes)) {
-                Notification::make()
-                    ->title(__('filament-media::media-library.invalid_file_type', [
-                        'name' => method_exists($file, 'getClientOriginalName') ? $file->getClientOriginalName() : '',
-                    ]))
-                    ->danger()
-                    ->send();
-
-                continue;
-            }
+            $name = '';
 
             try {
+                $name = $file->getClientOriginalName();
+
+                if (! FileType::mimeMatches($file->getMimeType(), $this->acceptedMimeTypes)) {
+                    $this->addError('uploads', __('filament-media::media-library.invalid_file_type', [
+                        'name' => $name,
+                    ]));
+                    app(TemporaryUploadCleaner::class)->delete($file);
+
+                    continue;
+                }
+
                 $lastMedia = app(FileUploader::class)->upload(
                     $file,
                     directory: $this->uploadPath,
@@ -184,20 +192,23 @@ class MediaPickerBrowser extends Component
             } catch (Throwable $exception) {
                 report($exception);
 
-                Notification::make()
-                    ->title(__('filament-media::media-library.notifications.operation_failed'))
-                    ->body($exception->getMessage())
-                    ->danger()
-                    ->send();
+                $this->addError('uploads', __('filament-media::media-library.upload_failed_file', [
+                    'name' => $name,
+                    'reason' => $exception->getMessage(),
+                ]));
+                app(TemporaryUploadCleaner::class)->delete($file);
             }
         }
 
         $this->uploads = [];
-        $this->tab = 'library';
         $this->resetPage('mediaPickerPage');
 
         if ($lastMedia !== null) {
             $this->selectedId = (int) $lastMedia->getKey();
+        }
+
+        if ($this->getErrorBag()->isEmpty()) {
+            $this->tab = 'library';
 
             Notification::make()
                 ->title(__('filament-media::media-library.notifications.uploaded'))

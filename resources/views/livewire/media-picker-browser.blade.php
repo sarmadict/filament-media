@@ -2,28 +2,76 @@
     $canUpload = $this->canUpload();
 @endphp
 
-<div class="filament-media-picker-browser" dir="{{ config('filament-media.ui.direction') ?: (in_array(app()->getLocale(), ['fa', 'ar', 'he', 'ur'], true) ? 'rtl' : 'ltr') }}">
+<div
+    class="filament-media-picker-browser"
+    dir="{{ config('filament-media.ui.direction') ?: (in_array(app()->getLocale(), ['fa', 'ar', 'he', 'ur'], true) ? 'rtl' : 'ltr') }}"
+    x-data="{
+        tab: $wire.entangle('tab'),
+        isDragging: false,
+        dragDepth: 0,
+        isUploading: false,
+        uploadProgress: 0,
+        uploadFailed: false,
+        dragEnter(event) {
+            if (this.isUploading || ! Array.from(event.dataTransfer?.types ?? []).includes('Files')) return;
+            event.preventDefault();
+            this.dragDepth++;
+            this.isDragging = true;
+            this.tab = 'upload';
+        },
+        dragLeave() {
+            this.dragDepth = Math.max(0, this.dragDepth - 1);
+            if (this.dragDepth === 0) this.isDragging = false;
+        },
+        uploadFiles(files) {
+            this.isDragging = false;
+            this.dragDepth = 0;
+            if (this.isUploading || ! files?.length) return;
+            this.tab = 'upload';
+            this.isUploading = true;
+            this.uploadProgress = 0;
+            this.uploadFailed = false;
+            this.$wire.uploadMultiple(
+                'uploads',
+                Array.from(files),
+                () => { this.isUploading = false },
+                () => { this.isUploading = false; this.uploadFailed = true; this.tab = 'upload' },
+                (event) => { this.uploadProgress = event.detail.progress },
+                () => { this.isUploading = false },
+            );
+        },
+    }"
+    @if ($canUpload)
+        x-on:dragenter="dragEnter($event)"
+        x-on:dragleave="dragLeave()"
+        x-on:dragover="
+            if (Array.from($event.dataTransfer?.types ?? []).includes('Files')) {
+                $event.preventDefault();
+                $event.dataTransfer.dropEffect = isUploading ? 'none' : 'copy';
+            }
+        "
+        x-on:drop.prevent="uploadFiles($event.dataTransfer.files)"
+    @endif
+>
     <div class="filament-media-picker-browser__tabs">
-        <button type="button" wire:click="$set('tab', 'library')" @class(['is-active' => $tab === 'library'])>
+        <button type="button" x-on:click="tab = 'library'" x-bind:class="{ 'is-active': tab === 'library' }" x-bind:disabled="isUploading">
             {{ __('filament-media::media-library.library') }}
         </button>
         @if ($canUpload)
-            <button type="button" wire:click="$set('tab', 'upload')" @class(['is-active' => $tab === 'upload'])>
+            <button type="button" x-on:click="tab = 'upload'" x-bind:class="{ 'is-active': tab === 'upload' }" x-bind:disabled="isUploading">
                 {{ __('filament-media::media-library.upload_tab') }}
             </button>
         @endif
     </div>
 
-    @if ($tab === 'upload' && $canUpload)
+    @if ($canUpload)
         <div
             class="filament-media-picker-upload"
-            x-data="{ isUploading: false }"
-            x-on:livewire-upload-start="isUploading = true"
-            x-on:livewire-upload-finish="isUploading = false"
-            x-on:livewire-upload-error="isUploading = false"
-            x-on:livewire-upload-cancel="isUploading = false"
+            x-show="tab === 'upload'"
+            x-cloak
+            x-bind:aria-busy="isUploading"
         >
-            <div class="filament-media-picker-upload__dropzone">
+            <div class="filament-media-picker-upload__dropzone" x-bind:class="{ 'is-dragging': isDragging }">
                 <x-filament::icon icon="heroicon-o-cloud-arrow-up" />
                 <strong>{{ __('filament-media::media-library.actions.upload') }}</strong>
                 <p>{{ __('filament-media::media-library.upload_here') }}</p>
@@ -32,49 +80,52 @@
                     <span>{{ __('filament-media::media-library.choose_files') }}</span>
                     <input
                         type="file"
-                        wire:model="uploads"
+                        x-on:change="uploadFiles($event.target.files); $event.target.value = ''"
+                        x-bind:disabled="isUploading"
                         @if ($acceptedMimeTypes !== []) accept="{{ implode(',', $acceptedMimeTypes) }}" @endif
                         multiple
                     >
                 </label>
 
-                @if ($uploads !== [])
-                    <div class="filament-media-picker-upload__selected">
-                        {{ count($uploads) }} {{ __('filament-media::media-library.selected') }}
+                <div class="filament-media-picker-upload__progress" x-show="isUploading" role="status" aria-live="polite">
+                    <span>{{ __('filament-media::media-library.uploading') }}</span>
+                    <progress max="100" x-bind:value="uploadProgress"></progress>
+                </div>
+                @if ($errors->get('uploads*') !== [])
+                    <div class="filament-media-picker-upload__error" x-show="!isUploading" role="alert">
+                        <strong>{{ __('filament-media::media-library.upload_failed') }}</strong>
+                        <ul>
+                            @foreach ($errors->get('uploads*') as $messages)
+                                @foreach ($messages as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            @endforeach
+                        </ul>
+                    </div>
+                @else
+                    <div class="filament-media-picker-upload__error" x-show="uploadFailed" role="alert">
+                        {{ __('filament-media::media-library.upload_transport_failed') }}
                     </div>
                 @endif
-
-                <button
-                    type="button"
-                    class="filament-media-picker-confirm"
-                    wire:click="storeUploads"
-                    wire:loading.attr="disabled"
-                    wire:target="storeUploads"
-                    x-bind:disabled="isUploading || $wire.uploads.length === 0"
-                    @disabled($uploads === [])
-                >
-                    <x-filament::icon icon="heroicon-o-arrow-up-tray" />
-                    {{ __('filament-media::media-library.actions.upload') }}
-                </button>
             </div>
         </div>
-    @else
-        <div class="filament-media-picker-browser__toolbar">
-            <select wire:model.live="disk" aria-label="{{ __('filament-media::media-library.disk') }}">
-                @foreach ($this->disks() as $availableDisk)
-                    <option value="{{ $availableDisk }}">{{ $availableDisk }}</option>
-                @endforeach
-            </select>
+    @endif
+    <div class="filament-media-picker-browser__toolbar" x-show="tab !== 'upload'" x-cloak>
+        <select wire:model.live="disk" aria-label="{{ __('filament-media::media-library.disk') }}">
+            @foreach ($this->disks() as $availableDisk)
+                <option value="{{ $availableDisk }}">{{ $availableDisk }}</option>
+            @endforeach
+        </select>
 
-            <input
-                type="search"
-                wire:model.live.debounce.300ms="search"
-                placeholder="{{ __('filament-media::media-library.picker_search') }}"
-            >
-        </div>
+        <input
+            type="search"
+            wire:model.live.debounce.300ms="search"
+            placeholder="{{ __('filament-media::media-library.picker_search') }}"
+        >
+    </div>
 
-        <div class="filament-media-picker-browser__workspace">
-            <div class="filament-media-picker-browser__body">
+    <div class="filament-media-picker-browser__workspace" x-show="tab !== 'upload'" x-cloak>
+        <div class="filament-media-picker-browser__body">
             @if ($mediaItems->isEmpty())
                 <div class="filament-media-picker-browser__empty">
                     <x-filament::icon icon="heroicon-o-photo" />
@@ -127,83 +178,82 @@
                     @endforeach
                 </div>
             @endif
-            </div>
-
-            <aside class="filament-media-picker-browser__details">
-                @if ($selectedMedia)
-                    @php
-                        $selectedIsImage = \Sarmadict\FilamentMedia\Support\FileType::isImageMime($selectedMedia['mime_type']);
-                        $selectedIsVideo = \Sarmadict\FilamentMedia\Support\FileType::isVideoMime($selectedMedia['mime_type']);
-                        $selectedIsAudio = \Sarmadict\FilamentMedia\Support\FileType::isAudioMime($selectedMedia['mime_type']);
-                    @endphp
-
-                    <div class="filament-media-picker-details__preview" wire:key="picker-preview-{{ $selectedMedia['id'] }}">
-                        @if ($selectedIsImage && $selectedMedia['url'])
-                            <img src="{{ $selectedMedia['url'] }}" alt="">
-                        @elseif ($selectedIsVideo && $selectedMedia['preview_url'])
-                            <video src="{{ $selectedMedia['preview_url'] }}" controls playsinline preload="metadata" aria-label="{{ $selectedMedia['name'] }}"></video>
-                        @elseif ($selectedIsAudio && $selectedMedia['preview_url'])
-                            <audio src="{{ $selectedMedia['preview_url'] }}" controls preload="metadata" aria-label="{{ $selectedMedia['name'] }}"></audio>
-                        @elseif ($selectedIsVideo)
-                            <x-filament::icon icon="heroicon-o-film" />
-                        @elseif ($selectedIsAudio)
-                            <x-filament::icon icon="heroicon-o-musical-note" />
-                        @else
-                            <x-filament::icon icon="heroicon-o-document" />
-                        @endif
-                    </div>
-
-                    <strong class="filament-media-picker-details__name">{{ $selectedMedia['name'] }}</strong>
-
-                    <dl class="filament-media-picker-details__list">
-                        <div><dt>{{ __('filament-media::media-library.file_name') }}</dt><dd>{{ $selectedMedia['file_name'] }}</dd></div>
-                        <div><dt>{{ __('filament-media::media-library.mime_type') }}</dt><dd dir="ltr">{{ $selectedMedia['mime_type'] }}</dd></div>
-                        <div><dt>{{ __('filament-media::media-library.file_size') }}</dt><dd dir="ltr">{{ $selectedMedia['size'] }}</dd></div>
-                        <div><dt>{{ __('filament-media::media-library.disk') }}</dt><dd dir="ltr">{{ $selectedMedia['disk'] }}</dd></div>
-                        <div><dt>{{ __('filament-media::media-library.file_path') }}</dt><dd dir="ltr">{{ $selectedMedia['path'] }}</dd></div>
-                        @if ($selectedMedia['width'] && $selectedMedia['height'])
-                            <div><dt>{{ __('filament-media::media-library.dimensions') }}</dt><dd dir="ltr">{{ $selectedMedia['width'] }} × {{ $selectedMedia['height'] }}</dd></div>
-                        @endif
-                    </dl>
-                @else
-                    <div class="filament-media-picker-details__empty">
-                        <x-filament::icon icon="heroicon-o-cursor-arrow-rays" />
-                        <span>{{ __('filament-media::media-library.no_selection') }}</span>
-                    </div>
-                @endif
-            </aside>
         </div>
 
-        <div class="filament-media-picker-browser__footer">
-            <div class="filament-media-picker-browser__pagination">
-                <button
-                    type="button"
-                    wire:click="previousPage('mediaPickerPage')"
-                    @disabled($mediaItems->onFirstPage())
-                >
-                    <x-filament::icon icon="heroicon-o-chevron-right" />
-                </button>
-                <span>{{ $mediaItems->currentPage() }} / {{ max(1, $mediaItems->lastPage()) }}</span>
-                <button
-                    type="button"
-                    wire:click="nextPage('mediaPickerPage')"
-                    @disabled(! $mediaItems->hasMorePages())
-                >
-                    <x-filament::icon icon="heroicon-o-chevron-left" />
-                </button>
-            </div>
+        <aside class="filament-media-picker-browser__details">
+            @if ($selectedMedia)
+                @php
+                    $selectedIsImage = \Sarmadict\FilamentMedia\Support\FileType::isImageMime($selectedMedia['mime_type']);
+                    $selectedIsVideo = \Sarmadict\FilamentMedia\Support\FileType::isVideoMime($selectedMedia['mime_type']);
+                    $selectedIsAudio = \Sarmadict\FilamentMedia\Support\FileType::isAudioMime($selectedMedia['mime_type']);
+                @endphp
 
+                <div class="filament-media-picker-details__preview" wire:key="picker-preview-{{ $selectedMedia['id'] }}">
+                    @if ($selectedIsImage && $selectedMedia['url'])
+                        <img src="{{ $selectedMedia['url'] }}" alt="">
+                    @elseif ($selectedIsVideo && $selectedMedia['preview_url'])
+                        <video src="{{ $selectedMedia['preview_url'] }}" controls playsinline preload="metadata" aria-label="{{ $selectedMedia['name'] }}"></video>
+                    @elseif ($selectedIsAudio && $selectedMedia['preview_url'])
+                        <audio src="{{ $selectedMedia['preview_url'] }}" controls preload="metadata" aria-label="{{ $selectedMedia['name'] }}"></audio>
+                    @elseif ($selectedIsVideo)
+                        <x-filament::icon icon="heroicon-o-film" />
+                    @elseif ($selectedIsAudio)
+                        <x-filament::icon icon="heroicon-o-musical-note" />
+                    @else
+                        <x-filament::icon icon="heroicon-o-document" />
+                    @endif
+                </div>
+
+                <strong class="filament-media-picker-details__name">{{ $selectedMedia['name'] }}</strong>
+
+                <dl class="filament-media-picker-details__list">
+                    <div><dt>{{ __('filament-media::media-library.file_name') }}</dt><dd>{{ $selectedMedia['file_name'] }}</dd></div>
+                    <div><dt>{{ __('filament-media::media-library.mime_type') }}</dt><dd dir="ltr">{{ $selectedMedia['mime_type'] }}</dd></div>
+                    <div><dt>{{ __('filament-media::media-library.file_size') }}</dt><dd dir="ltr">{{ $selectedMedia['size'] }}</dd></div>
+                    <div><dt>{{ __('filament-media::media-library.disk') }}</dt><dd dir="ltr">{{ $selectedMedia['disk'] }}</dd></div>
+                    <div><dt>{{ __('filament-media::media-library.file_path') }}</dt><dd dir="ltr">{{ $selectedMedia['path'] }}</dd></div>
+                    @if ($selectedMedia['width'] && $selectedMedia['height'])
+                        <div><dt>{{ __('filament-media::media-library.dimensions') }}</dt><dd dir="ltr">{{ $selectedMedia['width'] }} × {{ $selectedMedia['height'] }}</dd></div>
+                    @endif
+                </dl>
+            @else
+                <div class="filament-media-picker-details__empty">
+                    <x-filament::icon icon="heroicon-o-cursor-arrow-rays" />
+                    <span>{{ __('filament-media::media-library.no_selection') }}</span>
+                </div>
+            @endif
+        </aside>
+    </div>
+
+    <div class="filament-media-picker-browser__footer" x-show="tab !== 'upload'" x-cloak>
+        <div class="filament-media-picker-browser__pagination">
             <button
                 type="button"
-                class="filament-media-picker-confirm"
-                wire:click="confirmSelection"
-                @disabled($selectedId === null)
+                wire:click="previousPage('mediaPickerPage')"
+                @disabled($mediaItems->onFirstPage())
             >
-                <x-filament::icon icon="heroicon-o-check" />
-                {{ __('filament-media::media-library.actions.confirm') }}
+                <x-filament::icon icon="heroicon-o-chevron-right" />
+            </button>
+            <span>{{ $mediaItems->currentPage() }} / {{ max(1, $mediaItems->lastPage()) }}</span>
+            <button
+                type="button"
+                wire:click="nextPage('mediaPickerPage')"
+                @disabled(! $mediaItems->hasMorePages())
+            >
+                <x-filament::icon icon="heroicon-o-chevron-left" />
             </button>
         </div>
-    @endif
+
+        <button
+            type="button"
+            class="filament-media-picker-confirm"
+            wire:click="confirmSelection"
+            @disabled($selectedId === null)
+        >
+            <x-filament::icon icon="heroicon-o-check" />
+            {{ __('filament-media::media-library.actions.confirm') }}
+        </button>
+    </div>
 
     @once
         <style>
@@ -265,13 +315,21 @@
             .filament-media-picker-upload { grid-row: 2 / -1; min-height: 0; overflow-y: auto; display: grid; place-items: center; padding: 28px; }
             .filament-media-picker-upload__dropzone { width: min(580px, 100%); min-height: 330px; padding: 30px; border: 2px dashed rgb(209 213 219); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; background: rgb(249 250 251); }
             .dark .filament-media-picker-upload__dropzone { background: rgb(31 41 55); border-color: rgb(75 85 99); }
+            .filament-media-picker-upload__dropzone.is-dragging { border-color: rgb(59 130 246); background: rgb(239 246 255); }
+            .dark .filament-media-picker-upload__dropzone.is-dragging { background: rgb(30 58 138 / .3); }
             .filament-media-picker-upload__dropzone > svg { width: 48px; height: 48px; color: rgb(59 130 246); }
             .filament-media-picker-upload__dropzone strong { font-size: 15px; }
             .filament-media-picker-upload__dropzone p { max-width: 440px; color: rgb(107 114 128); font-size: 11px; }
             .filament-media-picker-upload__dropzone label { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 7px 13px; border: 1px solid rgb(209 213 219); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: white; }
             .dark .filament-media-picker-upload__dropzone label { background: rgb(17 24 39); border-color: rgb(75 85 99); }
             .filament-media-picker-upload__dropzone input { display: none; }
-            .filament-media-picker-upload__selected { font-size: 11px; color: rgb(5 150 105); }
+            .filament-media-picker-upload__dropzone label:has(input:disabled) { opacity: .5; cursor: wait; }
+            .filament-media-picker-upload__progress { width: min(320px, 100%); display: grid; gap: 8px; font-size: 12px; }
+            .filament-media-picker-upload__progress progress { width: 100%; accent-color: rgb(37 99 235); }
+            .filament-media-picker-upload__error { width: 100%; padding: 12px; border: 1px solid rgb(252 165 165); border-radius: 8px; color: rgb(153 27 27); background: rgb(254 242 242); font-size: 12px; overflow-wrap: anywhere; }
+            .filament-media-picker-upload__error strong { font-size: 13px; }
+            .filament-media-picker-upload__error ul { display: grid; gap: 6px; margin-top: 8px; }
+            .dark .filament-media-picker-upload__error { border-color: rgb(153 27 27); color: rgb(254 202 202); background: rgb(127 29 29 / .2); }
             @media (max-width: 700px) {
                 .filament-media-picker-browser__toolbar { grid-template-columns: 1fr; }
                 .filament-media-picker-browser__workspace { display: block; overflow-y: auto; }

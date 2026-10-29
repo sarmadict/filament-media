@@ -3,10 +3,12 @@
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Sarmadict\FilamentMedia\Livewire\MediaPickerBrowser;
 use Sarmadict\FilamentMedia\Models\MediaFile;
+use Sarmadict\FilamentMedia\Services\MediaRegistrar;
 
 uses(RefreshDatabase::class);
 
@@ -149,11 +151,11 @@ it('keeps field upload overrides isolated between pickers', function (): void {
         'uploadPathType' => 'flat',
         'uploadFilenameType' => 'hash',
     ])->set('uploads', [UploadedFile::fake()->createWithContent('custom.txt', 'Custom.')])
-        ->call('storeUploads')->assertHasNoErrors();
+        ->assertHasNoErrors();
 
     Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'default-picker'])
         ->set('uploads', [UploadedFile::fake()->createWithContent('default.txt', 'Default.')])
-        ->call('storeUploads')->assertHasNoErrors();
+        ->assertHasNoErrors();
 
     $custom = MediaFile::query()->where('original_name', 'custom.txt')->firstOrFail();
     $default = MediaFile::query()->where('original_name', 'default.txt')->firstOrFail();
@@ -173,7 +175,7 @@ it('prevents clients from changing configured upload overrides', function (strin
 })->with(['uploadPath', 'uploadPathType', 'uploadFilenameType', 'uploadDateFormat'])
     ->throws(CannotUpdateLockedPropertyException::class);
 
-it('keeps upload readiness separate from the save loading state', function (): void {
+it('accepts drops across both tabs and starts file selections without a confirmation button', function (): void {
     config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
     config()->set('filament-media.authorization.enabled', false);
 
@@ -182,31 +184,18 @@ it('keeps upload readiness separate from the save loading state', function (): v
     $picker = Livewire::test(MediaPickerBrowser::class, [
         'pickerId' => 'upload-picker',
         'disk' => 'public',
-    ])->set('tab', 'upload');
+    ]);
 
     $document = new DOMDocument;
     @$document->loadHTML($picker->html());
-    $button = (new DOMXPath($document))->query('//button[@*[name()="wire:click"]="storeUploads"]')->item(0);
+    $xpath = new DOMXPath($document);
+    $browser = $xpath->query('//div[contains(@class, "filament-media-picker-browser")][@*[name()="x-data"]]')->item(0);
+    $input = $xpath->query('//input[@type="file"]')->item(0);
 
-    expect($button)->toBeInstanceOf(DOMElement::class)
-        ->and($button->hasAttribute('disabled'))->toBeTrue()
-        ->and(explode(',', $button->getAttribute('wire:target')))->not->toContain('uploads');
-
-    $picker->set('uploads', [UploadedFile::fake()->createWithContent('notes.txt', 'Example upload.')])
-        ->assertHasNoErrors()
-        ->assertSee('1 '.__('filament-media::media-library.selected'));
-
-    @$document->loadHTML($picker->html());
-    $button = (new DOMXPath($document))->query('//button[@*[name()="wire:click"]="storeUploads"]')->item(0);
-
-    expect($button->hasAttribute('disabled'))->toBeFalse();
-
-    $picker->set('uploads', []);
-
-    @$document->loadHTML($picker->html());
-    $button = (new DOMXPath($document))->query('//button[@*[name()="wire:click"]="storeUploads"]')->item(0);
-
-    expect($button->hasAttribute('disabled'))->toBeTrue();
+    expect($browser->getAttribute('x-on:dragenter'))->toBe('dragEnter($event)')
+        ->and($browser->getAttribute('x-on:drop.prevent'))->toBe('uploadFiles($event.dataTransfer.files)')
+        ->and($input->getAttribute('x-on:change'))->toContain('uploadFiles($event.target.files)')
+        ->and($xpath->query('//button[@*[name()="wire:click"]="storeUploads"]'))->toHaveCount(0);
 });
 
 it('stores multiple uploaded files and resets the picker for the next upload', function (): void {
@@ -225,7 +214,6 @@ it('stores multiple uploaded files and resets the picker for the next upload', f
             UploadedFile::fake()->createWithContent('first.txt', 'First upload.'),
             UploadedFile::fake()->createWithContent('second.txt', 'Second upload.'),
         ])
-        ->call('storeUploads')
         ->assertHasNoErrors()
         ->assertSet('uploads', [])
         ->assertSet('tab', 'library');
@@ -237,10 +225,191 @@ it('stores multiple uploaded files and resets the picker for the next upload', f
         ->and($picker->get('selectedId'))->toBe($mediaFiles->last()->getKey());
 
     Storage::disk('public')->assertExists($mediaFiles->pluck('path')->all());
+    expect(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([]);
 
     $picker->set('tab', 'upload')->set('uploads', [
         UploadedFile::fake()->createWithContent('third.txt', 'Another upload.'),
-    ])->call('storeUploads')->assertHasNoErrors()->assertSet('uploads', []);
+    ])->assertHasNoErrors()->assertSet('uploads', []);
 
     expect(MediaFile::query()->count())->toBe(3);
+});
+
+it('automatically persists files dropped while the library tab is active', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    Storage::fake('public');
+
+    $picker = Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'drop-picker'])
+        ->set('uploads', [UploadedFile::fake()->createWithContent('dropped.txt', 'Dropped file.')])
+        ->assertHasNoErrors()
+        ->assertSet('uploads', [])
+        ->assertSet('tab', 'library');
+
+    $media = MediaFile::query()->sole();
+
+    expect($picker->get('selectedId'))->toBe($media->getKey());
+    Storage::disk('public')->assertExists($media->path);
+});
+
+it('rejects disallowed MIME types during automatic uploads while saving allowed files', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    Storage::fake('public');
+
+    $picker = Livewire::test(MediaPickerBrowser::class, [
+        'pickerId' => 'restricted-picker',
+        'acceptedMimeTypes' => ['text/plain'],
+    ])->set('uploads', [
+        UploadedFile::fake()->create('rejected.pdf', 1, 'application/pdf'),
+        UploadedFile::fake()->createWithContent('allowed.txt', 'Allowed file.'),
+    ])->assertHasErrors(['uploads'])
+        ->assertSet('uploads', [])
+        ->assertSet('tab', 'upload')
+        ->assertSee(__('filament-media::media-library.invalid_file_type', ['name' => 'rejected.pdf']));
+
+    $media = MediaFile::query()->sole();
+
+    expect($media->original_name)->toBe('allowed.txt')
+        ->and($picker->get('selectedId'))->toBe($media->getKey())
+        ->and(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([]);
+    Storage::disk('public')->assertExists($media->path);
+});
+
+it('shows a persistent alert and removes rejected uploads when the whole batch has mismatched types', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    Storage::fake('public');
+
+    $picker = Livewire::test(MediaPickerBrowser::class, [
+        'pickerId' => 'rejected-picker',
+        'acceptedMimeTypes' => ['image/*'],
+    ])->set('uploads', [UploadedFile::fake()->createWithContent('notes.txt', 'Not an image.')])
+        ->assertHasErrors(['uploads'])
+        ->assertSet('uploads', [])
+        ->assertSet('tab', 'upload')
+        ->assertSet('selectedId', null);
+
+    $document = new DOMDocument;
+    @$document->loadHTML($picker->html());
+    $alerts = (new DOMXPath($document))->query('//div[@role="alert"]');
+
+    expect($alerts)->toHaveCount(1)
+        ->and($alerts->item(0)->textContent)->toContain(__('filament-media::media-library.invalid_file_type', ['name' => 'notes.txt']))
+        ->and(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([])
+        ->and(MediaFile::query()->count())->toBe(0);
+});
+
+it('keeps failed saves on the upload tab with the reason and clears errors on a successful retry', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    Storage::fake('public');
+    $registrar = app(MediaRegistrar::class);
+    $failingRegistrar = Mockery::mock(MediaRegistrar::class);
+    $failingRegistrar->shouldReceive('register')->once()->andThrow(new RuntimeException('Media registry unavailable.'));
+    app()->instance(MediaRegistrar::class, $failingRegistrar);
+
+    $picker = Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'retry-picker'])
+        ->set('uploads', [UploadedFile::fake()->createWithContent('notes.txt', 'Failed upload.')])
+        ->assertHasErrors(['uploads'])
+        ->assertSet('tab', 'upload')
+        ->assertSet('uploads', [])
+        ->assertSet('selectedId', null)
+        ->assertSee(__('filament-media::media-library.upload_failed_file', [
+            'name' => 'notes.txt',
+            'reason' => 'Media registry unavailable.',
+        ]));
+
+    expect(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([])
+        ->and(Storage::disk('public')->allFiles())->toBe([])
+        ->and(MediaFile::query()->count())->toBe(0);
+
+    app()->instance(MediaRegistrar::class, $registrar);
+
+    $picker->set('uploads', [UploadedFile::fake()->createWithContent('notes.txt', 'Successful retry.')])
+        ->assertHasNoErrors()
+        ->assertSet('tab', 'library')
+        ->assertDontSee('Media registry unavailable.');
+
+    expect(MediaFile::query()->count())->toBe(1)
+        ->and(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([]);
+});
+
+it('preserves successful files but stays on upload when another file cannot be persisted', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    Storage::fake('public');
+    MediaFile::creating(function (MediaFile $media): void {
+        if ($media->original_name === 'failed.txt') {
+            throw new RuntimeException('Media registry unavailable.');
+        }
+    });
+
+    $picker = Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'partial-picker'])
+        ->set('uploads', [
+            UploadedFile::fake()->createWithContent('saved.txt', 'Successful upload.'),
+            UploadedFile::fake()->createWithContent('failed.txt', 'Failed upload.'),
+        ])->assertHasErrors(['uploads'])
+        ->assertSet('tab', 'upload')
+        ->assertSet('uploads', [])
+        ->assertSee('Media registry unavailable.');
+
+    $media = MediaFile::query()->sole();
+
+    expect($media->original_name)->toBe('saved.txt')
+        ->and($picker->get('selectedId'))->toBe($media->getKey())
+        ->and(Storage::disk('public')->allFiles())->toBe([$media->path])
+        ->and(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([]);
+});
+
+it('shows Livewire upload validation errors without changing tabs or leaving temporary files', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    config()->set('livewire.temporary_file_upload.rules', ['required', 'file', 'max:1']);
+    Storage::fake('public');
+
+    $picker = Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'oversized-picker'])
+        ->set('tab', 'upload')
+        ->set('uploads', [UploadedFile::fake()->create('oversized.txt', 2, 'text/plain')])
+        ->assertHasErrors(['uploads.0'])
+        ->assertSet('tab', 'upload');
+
+    $document = new DOMDocument;
+    @$document->loadHTML($picker->html());
+    $alerts = (new DOMXPath($document))->query('//div[@role="alert"]');
+
+    expect($alerts)->toHaveCount(1)
+        ->and($alerts->item(0)->textContent)->toContain('1 kilobytes')
+        ->and(FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::directory()))->toBe([])
+        ->and(MediaFile::query()->count())->toBe(0);
+});
+
+it('hides drag and drop uploads and rejects uploads when permission is missing', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+
+    $picker = Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'unauthorized-picker']);
+
+    $document = new DOMDocument;
+    @$document->loadHTML($picker->html());
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//input[@type="file"] | //*[@*[name()="x-on:drop.prevent"]]'))->toHaveCount(0);
+
+    $picker->set('uploads', [UploadedFile::fake()->createWithContent('notes.txt', 'Forbidden.')])
+        ->assertForbidden();
+
+    expect(MediaFile::query()->count())->toBe(0);
+});
+
+it('rejects automatic uploads to a disk other than the media disk', function (): void {
+    config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+    config()->set('filament-media.authorization.enabled', false);
+    config()->set('filesystems.disks.other', ['driver' => 'local']);
+    Storage::fake('public');
+    Storage::fake('other');
+
+    Livewire::test(MediaPickerBrowser::class, ['pickerId' => 'other-disk-picker', 'disk' => 'other'])
+        ->set('uploads', [UploadedFile::fake()->createWithContent('notes.txt', 'Forbidden.')])
+        ->assertForbidden();
+
+    expect(MediaFile::query()->count())->toBe(0);
 });

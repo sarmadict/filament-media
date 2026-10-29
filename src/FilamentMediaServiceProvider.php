@@ -4,6 +4,7 @@ namespace Sarmadict\FilamentMedia;
 
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
+use Sarmadict\FilamentMedia\Commands\PurgeTemporaryUploadsCommand;
 use Sarmadict\FilamentMedia\Contracts\MediaRepository;
 use Sarmadict\FilamentMedia\Contracts\MediaUsageResolver;
 use Sarmadict\FilamentMedia\Contracts\PreviewUrlResolver;
@@ -50,6 +51,8 @@ class FilamentMediaServiceProvider extends ServiceProvider
         Livewire::component('filament-media.media-picker-browser', MediaPickerBrowser::class);
 
         if ($this->app->runningInConsole()) {
+            $this->commands([PurgeTemporaryUploadsCommand::class]);
+
             $this->publishes([
                 __DIR__.'/../config/filament-media.php' => config_path('filament-media.php'),
             ], 'filament-media-config');

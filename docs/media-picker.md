@@ -132,6 +132,12 @@ MediaPicker::make('asset_media_id')
 
 The picker only returns active registered media. Uploads use the configured media disk and the field's upload settings with global fallback, and are registered immediately.
 
+Drag files anywhere inside the picker to open the Upload tab, then drop them to upload. Choosing files in the Upload tab also starts uploading immediately, with progress shown and no additional upload confirmation. When every file succeeds, the picker returns to the Library tab and selects the last uploaded file. Confirm selection to use that file in the form.
+
+If a file fails or has a disallowed MIME type, the picker stays on Upload and displays an alert with the filename and reason. Files that succeeded in the same batch remain available in the Library tab. Failed and rejected uploads and their temporary JSON metadata are removed immediately. Starting a new batch clears the previous errors once files reach the picker.
+
+Uploads remain restricted to users with create permission while the configured media disk is selected. MIME restrictions apply to dropped files as well as files chosen from the browser.
+
 ## Database relationship for ID results
 
 A typical host model relation is:

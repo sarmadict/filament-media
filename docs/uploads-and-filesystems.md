@@ -47,6 +47,27 @@ Uploads are only written to the disk configured by `FILAMENT_MEDIA_DISK` (`filam
 
 The standalone browser uses global upload settings; the currently browsed folder does not override them. Media-picker uploads use field overrides with global fallback. For date layouts, `UploadPathResolver` does not append the same current date directory twice when a caller explicitly supplies a base path that already ends with that date path.
 
+## Temporary uploads and cleanup
+
+Livewire temporarily stores uploads and their JSON metadata before the package saves the permanent file and registers it. `FileUploader` deletes both temporary files after each upload attempt, including failed persistence, for picker and standalone browser uploads. The picker also removes files rejected by its MIME restrictions. Abandoned uploads and any files left behind by storage cleanup failures can be purged with the command below.
+
+Purge existing abandoned uploads with:
+
+```bash
+php artisan filament-media:purge-temporary-uploads --dry-run
+php artisan filament-media:purge-temporary-uploads
+```
+
+The command uses `livewire.temporary_file_upload.disk` (falling back to the default filesystem disk) and `livewire.temporary_file_upload.directory` (default `livewire-tmp`). It removes files older than 24 hours, including orphaned JSON metadata, and preserves an upload/metadata pair if either file is recent. `--hours=48` changes the minimum age to 48 hours; the value must be a positive integer. Permanent media outside the temporary directory is untouched.
+
+The temporary directory is shared with other Livewire components, so this command also purges their expired temporary uploads. It can be scheduled in the host application:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('filament-media:purge-temporary-uploads')->daily();
+```
+
 ## Visibility
 
 Set `FILAMENT_MEDIA_VISIBILITY=public` or `private` to force upload visibility. When it is not set, the package uses the selected Laravel disk's configured visibility and defaults to private if no public visibility is declared.

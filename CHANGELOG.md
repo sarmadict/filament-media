@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep failed picker uploads on the Upload tab with an alert explaining each failure, and remove temporary files and JSON metadata for failed or rejected uploads.
+- Added automatic picker uploads from dropped or selected files, with drag-triggered tab switching and upload progress.
+- Clean up Livewire temporary uploads and JSON metadata after saving media, and add `filament-media:purge-temporary-uploads` for expired data.
 - Added configurable picker modal widths globally and per field, using Filament's width scale and a full-screen option with edge margins.
 - Added unique time-ordered UUIDv7 values to media records, with an upgrade migration that backfills existing and soft-deleted rows.
 - Added independent date, UUID-prefix, and flat upload layouts and UUID/hash filename strategies, with per-field path and naming overrides.
